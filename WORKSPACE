@@ -23,7 +23,7 @@ http_archive(
 )
 
 new_local_repository(
-    name = "python_system",
-    build_file = "external/python.BUILD",
-    path = "/usr",
+    name = "python_headers",
+    path = "/usr/include/python2.7",  # May be overwritten by setup.py.
+    build_file = "external/python_headers.BUILD"
 )

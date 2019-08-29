@@ -461,10 +461,12 @@ class NestTest(parameterized.TestCase):
       tree.map_structure(lambda x, y: None, ((3, 4), 5), (3, (4, 5)),
                          check_types=False)
 
-    with self.assertRaisesRegexp(ValueError, "Only valid keyword argument"):
+    with self.assertRaisesRegexp(ValueError,
+                                 "Only valid keyword argument.*foo"):
       tree.map_structure(lambda x: None, STRUCTURE1, foo="a")
 
-    with self.assertRaisesRegexp(ValueError, "Only valid keyword argument"):
+    with self.assertRaisesRegexp(ValueError,
+                                 "Only valid keyword argument.*foo"):
       tree.map_structure(lambda x: None, STRUCTURE1, check_types=False, foo="a")
 
   def testMapStructureWithStrings(self):

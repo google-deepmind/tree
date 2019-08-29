@@ -3,7 +3,6 @@
 def tree_py_extension(name, srcs, hdrs, copts, features, deps):
     return native.cc_binary(
         name = name + ".so",
-        linkopts = ["-Wl,-Bsymbolic"],
         linkshared = 1,
         linkstatic = 1,
         srcs = srcs + hdrs,

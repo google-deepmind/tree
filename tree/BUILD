@@ -41,7 +41,7 @@ tree_py_extension(
         "@abseil-cpp//absl/memory",
         "@abseil-cpp//absl/strings",
         "@pybind11_archive//:pybind11",
-        "@python_system//:python",
+        "@python_headers",
     ],
 )
 

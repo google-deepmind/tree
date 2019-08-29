@@ -469,7 +469,7 @@ def pack_sequence_as(structure, flat_sequence):
   return _sequence_like(structure, packed)
 
 
-def map_structure(func, *structure, **check_types_dict):
+def map_structure(func, *structure, **kwargs):
   """Applies `func` to each entry in `structure` and returns a new structure.
 
   Applies `func(x[0], x[1], ...)` where x[i] is an entry in
@@ -490,7 +490,7 @@ def map_structure(func, *structure, **check_types_dict):
     func: A callable that accepts as many arguments as there are structures.
     *structure: scalar, or tuple or list of constructed scalars and/or other
       tuples/lists, or scalars.  Note: numpy arrays are considered as scalars.
-    **check_types_dict: only valid keyword argument is `check_types`. If set to
+    **kwargs: only valid keyword argument is `check_types`. If set to
       `True` (default) the types of iterables within the structures have to be
       same (e.g. `map_structure(func, [1], (1,))` raises a `TypeError`
       exception). To allow this set this argument to `False`.
@@ -518,12 +518,12 @@ def map_structure(func, *structure, **check_types_dict):
   if not structure:
     raise ValueError("Must provide at least one structure")
 
-  if check_types_dict:
-    if "check_types" not in check_types_dict or len(check_types_dict) > 1:
-      raise ValueError("Only valid keyword argument is check_types")
-    check_types = check_types_dict["check_types"]
-  else:
-    check_types = True
+  check_types = kwargs.pop("check_types", True)
+
+  if kwargs:
+    raise ValueError(
+        "Only valid keyword arguments are `check_types` "
+        "not: `%s`" % ("`, `".join(kwargs.keys())))
 
   for other in structure[1:]:
     assert_same_structure(structure[0], other, check_types=check_types)
@@ -726,7 +726,8 @@ def assert_shallow_structure(shallow_tree, input_tree, check_types=True,
         shallow_tree):
       raise ValueError(
           _STRUCTURES_HAVE_MISMATCHING_LENGTHS.format(
-              input_length=len(input_tree), shallow_length=len(shallow_tree)))
+              input_length=_num_elements(input_tree),
+              shallow_length=_num_elements(shallow_tree)))
     elif _num_elements(input_tree) < _num_elements(shallow_tree):
       raise ValueError(
           _INPUT_TREE_SMALLER_THAN_SHALLOW_TREE.format(

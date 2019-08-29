@@ -426,7 +426,7 @@ bool FlattenHelper(
     return PyList_Append(list, nested) != -1;
   }
 
-ValueIteratorPtr iter = value_iterator_getter(nested);
+  ValueIteratorPtr iter = value_iterator_getter(nested);
   if (!iter->valid()) return false;
 
   for (Safe_PyObjectPtr item = iter->next(); item; item = iter->next()) {

@@ -17,8 +17,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+import re
+import shutil
+
+from distutils import sysconfig
 import setuptools
-from setuptools import dist
+from setuptools.command import build_ext
 
 __version__ = '0.0.1'
 
@@ -31,12 +36,58 @@ REQUIRED_PACKAGES = [
     'six >= 1.12.0',
 ]
 
+WORKSPACE_PYTHON_HEADERS_PATTERN = re.compile(
+    r'(?<=path = ").*(?=",  # May be overwritten by setup\.py\.)')
 
-class BinaryDistribution(dist.Distribution):
-  """This class is needed in order to create OS specific wheels."""
 
-  def has_ext_modules(self):
-    return True
+class BazelExtension(setuptools.Extension):
+  """A C/C++ extension that is defined as a Bazel BUILD target."""
+
+  def __init__(self, bazel_target):
+    self.bazel_target = bazel_target
+    self.relpath, self.target_name = (
+        os.path.relpath(bazel_target, '//').split(':'))
+    ext_name = os.path.join(self.relpath, self.target_name)
+    setuptools.Extension.__init__(self, ext_name, sources=[])
+
+
+class BuildBazelExtension(build_ext.build_ext):
+  """A command that runs Bazel to build a C/C++ extension."""
+
+  def run(self):
+    for ext in self.extensions:
+      self.bazel_build(ext)
+    build_ext.build_ext.run(self)
+
+  def bazel_build(self, ext):
+    with open('WORKSPACE', 'r') as f:
+      workspace_contents = f.read()
+
+    with open('WORKSPACE', 'w') as f:
+      f.write(WORKSPACE_PYTHON_HEADERS_PATTERN.sub(
+          sysconfig.get_python_inc(), workspace_contents))
+
+    if not os.path.exists(self.build_temp):
+      os.makedirs(self.build_temp)
+
+    shared_lib_suffix = '.' + sysconfig.get_config_var('SO').split('.')[-1]
+
+    self.spawn([
+        'bazel',
+        'build',
+        ext.bazel_target + shared_lib_suffix,
+        '--symlink_prefix=' + os.path.join(self.build_temp, 'bazel-'),
+        '--compilation_mode=' + ('dbg' if self.debug else 'opt'),
+    ])
+
+    ext_bazel_bin_path = os.path.join(
+        self.build_temp, 'bazel-bin',
+        ext.relpath, ext.target_name + shared_lib_suffix)
+    ext_dest_path = self.get_ext_fullpath(ext.name)
+    ext_dest_dir = os.path.dirname(ext_dest_path)
+    if not os.path.exists(ext_dest_dir):
+      os.makedirs(ext_dest_dir)
+    shutil.copyfile(ext_bazel_bin_path, ext_dest_path)
 
 
 setuptools.setup(
@@ -47,10 +98,9 @@ setuptools.setup(
     # Contained modules and scripts.
     packages=setuptools.find_packages(),
     install_requires=REQUIRED_PACKAGES,
-    # Add in any packaged data.
-    include_package_data=True,
+    cmdclass=dict(build_ext=BuildBazelExtension),
+    ext_modules=[BazelExtension('//tree:_tree')],
     zip_safe=False,
-    distclass=BinaryDistribution,
     # PyPI package information.
     classifiers=[
         'Development Status :: 4 - Beta',
