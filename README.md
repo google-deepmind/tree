@@ -64,4 +64,4 @@ We have a mailing list located at: dm-tree@google.com
 
 ## License
 
-The project is licensed under the Apache license.
+The project is licensed under the Apache 2.0 license.
