@@ -202,6 +202,12 @@ py::object GetCollectionsMappingType() {
   return type;
 }
 
+py::object GetCollectionsMappingViewType() {
+    static py::object type =
+        py::module::import("collections").attr("MappingView");
+  return type;
+}
+
 // Returns 1 if `o` is considered a mapping for the purposes of Flatten().
 // Returns 0 otherwise.
 // Returns -1 if an error occurred.
@@ -210,6 +216,16 @@ int IsMappingHelper(PyObject* o) {
     return PyObject_IsInstance(to_check, GetCollectionsMappingType().ptr());
   });
   if (PyDict_Check(o)) return true;
+  return check_cache->CachedLookup(o);
+}
+
+// Returns 1 if `o` is considered a mapping view for the purposes of Flatten().
+// Returns 0 otherwise.
+// Returns -1 if an error occurred.
+int IsMappingViewHelper(PyObject* o) {
+  static auto* const check_cache = new CachedTypeCheck([](PyObject* to_check) {
+    return PyObject_IsInstance(to_check, GetCollectionsMappingViewType().ptr());
+  });
   return check_cache->CachedLookup(o);
 }
 
@@ -243,6 +259,7 @@ int IsSequenceHelper(PyObject* o) {
     return static_cast<int>(is_instance != 0 && !IsString(to_check));
   });  // We treat dicts and other mappings as special cases of sequences.
   if (IsMappingHelper(o)) return true;
+  if (IsMappingViewHelper(o)) return true;
   if (IsAttrsHelper(o)) return true;
   if (PySet_Check(o) && !WarnedThatSetIsNotSequence) {
     LOG_WARNING("Sets are not currently considered sequences, "

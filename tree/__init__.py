@@ -145,6 +145,9 @@ def _sequence_like(instance, args):
       return type(instance)(instance.default_factory, keys_and_values)
     else:
       return type(instance)(keys_and_values)
+  elif isinstance(instance, collections.MappingView):
+    # We can't directly construct mapping views, so we create a list instead
+    return list(args)
   elif _is_namedtuple(instance) or _is_attrs(instance):
     return type(instance)(*args)
   else:
