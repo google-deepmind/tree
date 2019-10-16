@@ -25,15 +25,19 @@ from distutils import sysconfig
 import setuptools
 from setuptools.command import build_ext
 
-__version__ = '0.0.1'
+__version__ = '0.1.0'
 
 PROJECT_NAME = 'tree'
 
-REQUIRED_PACKAGES = [
-    'absl-py >= 0.6.1',
-    'attrs >= 18.2.0',
-    'numpy >= 1.15.4',
-    'six >= 1.12.0',
+REQUIREMENTS = [
+    'six>=1.12.0',
+]
+
+TEST_REQUIREMENTS = [
+    'absl-py>=0.6.1',
+    'attrs>=18.2.0',
+    # TODO(slebedev): remove the upper bound once 2.7 support is dropped.
+    'numpy>=1.15.4, <1.17.0',
 ]
 
 WORKSPACE_PYTHON_HEADERS_PATTERN = re.compile(
@@ -97,7 +101,12 @@ setuptools.setup(
     author='DeepMind',
     # Contained modules and scripts.
     packages=setuptools.find_packages(),
-    install_requires=REQUIRED_PACKAGES,
+    install_requires=REQUIREMENTS + TEST_REQUIREMENTS,
+    tests_require=TEST_REQUIREMENTS,
+    test_suite='tree',
+    extras_require={
+        'test': TEST_REQUIREMENTS,
+    },
     cmdclass=dict(build_ext=BuildBazelExtension),
     ext_modules=[BazelExtension('//tree:_tree')],
     zip_safe=False,
@@ -105,7 +114,6 @@ setuptools.setup(
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
-        'Intended Audience :: Education',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 2.7',
