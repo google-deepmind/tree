@@ -29,19 +29,19 @@ __version__ = '0.1.0'
 
 PROJECT_NAME = 'tree'
 
-REQUIREMENTS = [
-    'six>=1.12.0',
-]
-
-TEST_REQUIREMENTS = [
-    'absl-py>=0.6.1',
-    'attrs>=18.2.0',
-    # TODO(slebedev): remove the upper bound once 2.7 support is dropped.
-    'numpy>=1.15.4, <1.17.0',
-]
-
 WORKSPACE_PYTHON_HEADERS_PATTERN = re.compile(
     r'(?<=path = ").*(?=",  # May be overwritten by setup\.py\.)')
+
+
+here = os.path.dirname(os.path.abspath(__file__))
+
+
+def _parse_requirements(path):
+  with open(os.path.join(here, path)) as f:
+    return [
+        line.rstrip() for line in f
+        if not (line.isspace() or line.startswith('#'))
+    ]
 
 
 class BazelExtension(setuptools.Extension):
@@ -101,12 +101,9 @@ setuptools.setup(
     author='DeepMind',
     # Contained modules and scripts.
     packages=setuptools.find_packages(),
-    install_requires=REQUIREMENTS + TEST_REQUIREMENTS,
-    tests_require=TEST_REQUIREMENTS,
+    install_requires=_parse_requirements('requirements.txt'),
+    tests_require=_parse_requirements('requirements-test.txt'),
     test_suite='tree',
-    extras_require={
-        'test': TEST_REQUIREMENTS,
-    },
     cmdclass=dict(build_ext=BuildBazelExtension),
     ext_modules=[BazelExtension('//tree:_tree')],
     zip_safe=False,

@@ -1,0 +1,4 @@
+absl-py>=0.6.1
+attrs>=18.2.0
+# TODO(slebedev): remove the upper bound once 2.7 support is dropped.
+numpy>=1.15.4,<1.17.0
