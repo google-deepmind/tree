@@ -50,6 +50,8 @@ import six
 from six.moves import zip
 from tree import _tree
 
+__version__ = "0.1.0"
+
 # Note: this is *not* the same as `six.string_types`, which in Python3 is just
 #       `(str,)` (i.e. it does not include byte strings).
 _TEXT_OR_BYTES = (six.text_type, six.binary_type)

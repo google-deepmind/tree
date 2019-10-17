@@ -25,15 +25,22 @@ from distutils import sysconfig
 import setuptools
 from setuptools.command import build_ext
 
-__version__ = '0.1.0'
-
-PROJECT_NAME = 'tree'
-
-WORKSPACE_PYTHON_HEADERS_PATTERN = re.compile(
-    r'(?<=path = ").*(?=",  # May be overwritten by setup\.py\.)')
-
 
 here = os.path.dirname(os.path.abspath(__file__))
+
+
+def _get_tree_version():
+  """Parse the version string from tree/__init__.py."""
+  with open(os.path.join(here, 'tree', '__init__.py')) as f:
+    try:
+      version_line = next(
+          line for line in f if line.startswith('__version__'))
+    except StopIteration:
+      raise ValueError('__version__ not defined in tree/__init__.py')
+    else:
+      ns = {}
+      exec(version_line, ns)  # pylint: disable=exec-used
+      return ns['__version__']
 
 
 def _parse_requirements(path):
@@ -68,8 +75,10 @@ class BuildBazelExtension(build_ext.build_ext):
       workspace_contents = f.read()
 
     with open('WORKSPACE', 'w') as f:
-      f.write(WORKSPACE_PYTHON_HEADERS_PATTERN.sub(
-          sysconfig.get_python_inc(), workspace_contents))
+      f.write(re.sub(
+          r'(?<=path = ").*(?=",  # May be overwritten by setup\.py\.)',
+          sysconfig.get_python_inc(),
+          workspace_contents))
 
     if not os.path.exists(self.build_temp):
       os.makedirs(self.build_temp)
@@ -95,10 +104,14 @@ class BuildBazelExtension(build_ext.build_ext):
 
 
 setuptools.setup(
-    name=PROJECT_NAME,
-    version=__version__,
+    name='tree',
+    version=_get_tree_version(),
+    url='https://github.com/deepmind/tree',
     description='Tree is a library for working with tree data structures.',
     author='DeepMind',
+    author_email='tree-copybara@google.com',
+    long_description=open('README.md').read(),
+    long_description_content_type='text/markdown',
     # Contained modules and scripts.
     packages=setuptools.find_packages(),
     install_requires=_parse_requirements('requirements.txt'),
