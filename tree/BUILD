@@ -10,7 +10,7 @@ load(
 
 package(default_visibility = ["//visibility:private"])
 
-licenses(["notice"])  # Apache 2.0 License
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
@@ -53,5 +53,13 @@ tree_py_test(
         # absl/testing:parameterized
         # attr
         # numpy
+    ],
+)
+
+tree_py_test(
+    name = "tree_benchmark",
+    srcs = ["tree_benchmark.py"],
+    deps = [
+        ":tree",
     ],
 )
