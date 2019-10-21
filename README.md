@@ -22,13 +22,13 @@ demanding applications, such as machine learning models.
 Install `tree` by running:
 
 ```shell
-$ pip install dm_tree
+$ pip install dm-tree
 ```
 
 ## Support
 
 If you are having issues, please let us know by filing an issue on our
-`issue tracker <https://github.com/deepmind/tree/issues>`_.
+[issue tracker](https://github.com/deepmind/tree/issues).
 
 ## License
 

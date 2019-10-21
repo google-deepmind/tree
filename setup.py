@@ -104,7 +104,7 @@ class BuildBazelExtension(build_ext.build_ext):
 
 
 setuptools.setup(
-    name='dm_tree',
+    name='dm-tree',
     version=_get_tree_version(),
     url='https://github.com/deepmind/tree',
     description='Tree is a library for working with nested data structures.',

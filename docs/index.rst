@@ -24,7 +24,7 @@ Installation
 
 Install ``tree`` by running::
 
-  $ pip install dm_tree
+  $ pip install dm-tree
 
 
 Reference
