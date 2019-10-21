@@ -107,10 +107,10 @@ setuptools.setup(
     name='dm_tree',
     version=_get_tree_version(),
     url='https://github.com/deepmind/tree',
-    description='Tree is a library for working with tree data structures.',
+    description='Tree is a library for working with nested data structures.',
     author='DeepMind',
     author_email='tree-copybara@google.com',
-    long_description=open('README.md').read(),
+    long_description=open(os.path.join(here, 'README.md')).read(),
     long_description_content_type='text/markdown',
     # Contained modules and scripts.
     packages=setuptools.find_packages(),

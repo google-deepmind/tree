@@ -38,7 +38,7 @@ class DoctestTest(parameterized.TestCase):
 
   def testDoctest(self):
     num_failed, num_attempted = doctest.testmod(
-        tree, optionflags=doctest.ELLIPSIS)
+        tree, extraglobs={"tree": tree}, optionflags=doctest.ELLIPSIS)
     self.assertGreater(num_attempted, 0, "No doctests found.")
     self.assertEqual(num_failed, 0, "{} doctests failed".format(num_failed))
 
@@ -525,24 +525,6 @@ class NestTest(parameterized.TestCase):
     # regression test for b/130633904
     tree.assert_shallow_structure({0: "foo"}, ["foo"], check_types=False)
 
-    # Regression test for previous bug where shallow_tree and input_tree's
-    # sorted keys were merely being zip-iterated in parallel.
-    # The calls below will break if that's the case, and succeed if input_tree
-    # is being iterated through using shallow_tree's keys, as it should.
-    tree.assert_shallow_structure(
-        shallow_tree={"b": {"a": None}},
-        input_tree={"a": None,
-                    "b": {"a": None},
-                    "c": None},
-        check_subtrees_length=False)
-    tree.assert_shallow_structure(
-        shallow_tree={1: {"foo": None}},
-        input_tree=[None,
-                    {"foo": None},
-                    None],
-        check_types=False,
-        check_subtrees_length=False)
-
   def testFlattenUpTo(self):
     # Shallow tree ends at scalar.
     input_tree = [[[2, 2], [3, 3]], [[4, 9], [5, 5]]]
@@ -629,15 +611,6 @@ class NestTest(parameterized.TestCase):
     self.assertEqual(flattened_input_tree, [input_tree])
     self.assertEqual(flattened_shallow_tree, [shallow_tree])
 
-    # Test case where len(shallow_tree) < len(input_tree)
-    input_tree = {"a": "A", "b": "B", "c": "C"}
-    shallow_tree = {"a": 1, "c": 2}
-    flattened_input_tree = tree.flatten_up_to(shallow_tree, input_tree,
-                                              check_subtrees_length=False)
-    flattened_shallow_tree = tree.flatten_up_to(shallow_tree, shallow_tree)
-    self.assertEqual(flattened_input_tree, ["A", "C"])
-    self.assertEqual(flattened_shallow_tree, [1, 2])
-
     # Using non-iterable elements.
     input_tree = [0]
     shallow_tree = 9
@@ -715,10 +688,9 @@ class NestTest(parameterized.TestCase):
     self.assertEqual(structure, flattened_structure)
 
   def testFlattenWithTuplePathsUpTo(self):
-    def get_paths_and_values(shallow_tree, input_tree,
-                             check_subtrees_length=True):
+    def get_paths_and_values(shallow_tree, input_tree):
       path_value_pairs = tree.flatten_with_tuple_paths_up_to(
-          shallow_tree, input_tree, check_subtrees_length=check_subtrees_length)
+          shallow_tree, input_tree)
       paths = [p for p, _ in path_value_pairs]
       values = [v for _, v in path_value_pairs]
       return paths, values
@@ -852,16 +824,6 @@ class NestTest(parameterized.TestCase):
             input_length=len(input_tree),
             shallow_length=len(shallow_tree))):
       get_paths_and_values(shallow_tree, input_tree)
-
-    (flattened_input_tree_paths,
-     flattened_input_tree) = get_paths_and_values(shallow_tree, input_tree,
-                                                  check_subtrees_length=False)
-    (flattened_shallow_tree_paths,
-     flattened_shallow_tree) = get_paths_and_values(shallow_tree, shallow_tree)
-    self.assertEqual(flattened_input_tree_paths, [("a",), ("c",)])
-    self.assertEqual(flattened_input_tree, ["A", "C"])
-    self.assertEqual(flattened_shallow_tree_paths, [("a",), ("c",)])
-    self.assertEqual(flattened_shallow_tree, [1, 2])
 
     # Using non-iterable elements.
     input_tree = [0]
