@@ -1,5 +1,5 @@
 # Description:
-#   Tree provides utilities for working with tree data structures.
+#   Tree provides utilities for working with nested data structures.
 
 load(
     "//tree:build_defs.bzl",
@@ -21,7 +21,6 @@ tree_py_library(
     tree_extension = ":_tree",
     visibility = ["//visibility:public"],
     deps = [
-        # absl/logging
         # six
     ],
 )
