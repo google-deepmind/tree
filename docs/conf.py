@@ -78,8 +78,8 @@ autodoc_default_options = {
 html_theme = 'sphinx_rtd_theme'
 
 html_theme_options = {
-    'collapse_navigation': False,
-    'sticky_navigation': False,
+    # 'collapse_navigation': False,
+    # 'sticky_navigation': False,
 }
 
 # -- Source code links -------------------------------------------------------
