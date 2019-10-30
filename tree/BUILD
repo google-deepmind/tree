@@ -62,3 +62,17 @@ tree_py_test(
         ":tree",
     ],
 )
+
+# TODO(b/143278181): Restrict visibility to projects which depend on the
+# deprecated functions and therefore could not migrate to ``:tree``.
+COMPAT_VISIBILITY = ["//visibility:public"]
+
+py_library(
+    name = "compat",
+    srcs = [],
+    srcs_version = "PY2AND3",
+    visibility = COMPAT_VISIBILITY,
+    deps = [
+        ":tree",
+    ],
+)
