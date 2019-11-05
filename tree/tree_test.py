@@ -48,7 +48,8 @@ class NestTest(parameterized.TestCase):
   def assertAllEquals(self, a, b):
     self.assertTrue((np.asarray(a) == b).all())
 
-  def testAttrsFlattenAndPack(self):
+  def testAttrsFlattenAndUnflatten(self):
+
     class BadAttr(object):
       """Class that has a non-iterable __attrs_attrs__."""
       __attrs_attrs__ = None
@@ -64,12 +65,12 @@ class NestTest(parameterized.TestCase):
     self.assertTrue(tree._is_attrs(sample_attr))
     flat = tree.flatten(sample_attr)
     self.assertEqual(field_values, flat)
-    restructured_from_flat = tree.pack_sequence_as(sample_attr, flat)
+    restructured_from_flat = tree.unflatten_as(sample_attr, flat)
     self.assertIsInstance(restructured_from_flat, SampleAttr)
     self.assertEqual(restructured_from_flat, sample_attr)
 
     # Check that flatten fails if attributes are not iterable
-    with self.assertRaisesRegexp(TypeError, "object is not iterable"):
+    with self.assertRaisesRegex(TypeError, "object is not iterable"):
       flat = tree.flatten(BadAttr())
 
   @parameterized.parameters([
@@ -89,18 +90,18 @@ class NestTest(parameterized.TestCase):
     new_structure = tree.map_structure(lambda x: x, structure)
     self.assertEqual(structure, new_structure)
 
-  def testFlattenAndPack(self):
+  def testFlattenAndUnflatten(self):
     structure = ((3, 4), 5, (6, 7, (9, 10), 8))
     flat = ["a", "b", "c", "d", "e", "f", "g", "h"]
     self.assertEqual(tree.flatten(structure), [3, 4, 5, 6, 7, 9, 10, 8])
     self.assertEqual(
-        tree.pack_sequence_as(structure, flat), (("a", "b"), "c",
-                                                 ("d", "e", ("f", "g"), "h")))
+        tree.unflatten_as(structure, flat),
+        (("a", "b"), "c", ("d", "e", ("f", "g"), "h")))
     point = collections.namedtuple("Point", ["x", "y"])
     structure = (point(x=4, y=2), ((point(x=1, y=0),),))
     flat = [4, 2, 1, 0]
     self.assertEqual(tree.flatten(structure), flat)
-    restructured_from_flat = tree.pack_sequence_as(structure, flat)
+    restructured_from_flat = tree.unflatten_as(structure, flat)
     self.assertEqual(restructured_from_flat, structure)
     self.assertEqual(restructured_from_flat[0].x, 4)
     self.assertEqual(restructured_from_flat[0].y, 2)
@@ -110,21 +111,20 @@ class NestTest(parameterized.TestCase):
     self.assertEqual([5], tree.flatten(5))
     self.assertEqual([np.array([5])], tree.flatten(np.array([5])))
 
-    self.assertEqual("a", tree.pack_sequence_as(5, ["a"]))
+    self.assertEqual("a", tree.unflatten_as(5, ["a"]))
     self.assertEqual(
-        np.array([5]), tree.pack_sequence_as("scalar", [np.array([5])]))
+        np.array([5]), tree.unflatten_as("scalar", [np.array([5])]))
 
-    with self.assertRaisesRegexp(ValueError, "Structure is a scalar"):
-      tree.pack_sequence_as("scalar", [4, 5])
+    with self.assertRaisesRegex(ValueError, "Structure is a scalar"):
+      tree.unflatten_as("scalar", [4, 5])
 
-    with self.assertRaisesRegexp(TypeError, "flat_sequence"):
-      tree.pack_sequence_as([4, 5], "bad_sequence")
+    with self.assertRaisesRegex(TypeError, "flat_sequence"):
+      tree.unflatten_as([4, 5], "bad_sequence")
 
     with self.assertRaises(ValueError):
-      tree.pack_sequence_as([5, 6, [7, 8]], ["a", "b", "c"])
+      tree.unflatten_as([5, 6, [7, 8]], ["a", "b", "c"])
 
   def testFlattenDictOrder(self):
-    """`flatten` orders dicts by key, including OrderedDicts."""
     ordered = collections.OrderedDict([("d", 3), ("b", 1), ("a", 0), ("c", 2)])
     plain = {"d": 3, "b": 1, "a": 0, "c": 2}
     ordered_flat = tree.flatten(ordered)
@@ -132,19 +132,18 @@ class NestTest(parameterized.TestCase):
     self.assertEqual([0, 1, 2, 3], ordered_flat)
     self.assertEqual([0, 1, 2, 3], plain_flat)
 
-  def testPackDictOrder(self):
-    """Packing orders dicts by key, including OrderedDicts."""
+  def testUnflattenDictOrder(self):
     ordered = collections.OrderedDict([("d", 0), ("b", 0), ("a", 0), ("c", 0)])
     plain = {"d": 0, "b": 0, "a": 0, "c": 0}
     seq = [0, 1, 2, 3]
-    ordered_reconstruction = tree.pack_sequence_as(ordered, seq)
-    plain_reconstruction = tree.pack_sequence_as(plain, seq)
+    ordered_reconstruction = tree.unflatten_as(ordered, seq)
+    plain_reconstruction = tree.unflatten_as(plain, seq)
     self.assertEqual(
         collections.OrderedDict([("d", 3), ("b", 1), ("a", 0), ("c", 2)]),
         ordered_reconstruction)
     self.assertEqual({"d": 3, "b": 1, "a": 0, "c": 2}, plain_reconstruction)
 
-  def testFlattenAndPack_withDicts(self):
+  def testFlattenAndUnflatten_withDicts(self):
     # A nice messy mix of tuples, lists, dicts, and `OrderedDict`s.
     named_tuple = collections.namedtuple("A", ("b", "c"))
     mess = [
@@ -182,11 +181,11 @@ class NestTest(parameterized.TestCase):
         "hi everybody",
     ]
 
-    unflattened = tree.pack_sequence_as(structure_of_mess, flattened)
-    self.assertEqual(unflattened, mess)
+    self.assertEqual(mess, tree.unflatten_as(structure_of_mess, flattened))
 
     # Check also that the OrderedDict was created, with the correct key order.
-    unflattened_ordered_dict = unflattened[2]["c"][1]
+    unflattened_ordered_dict = tree.unflatten_as(
+        structure_of_mess, flattened)[2]["c"][1]
     self.assertIsInstance(unflattened_ordered_dict, collections.OrderedDict)
     self.assertEqual(list(unflattened_ordered_dict.keys()), ["b", "a"])
 
@@ -199,36 +198,33 @@ class NestTest(parameterized.TestCase):
     structure = "lots of letters"
     flattened = tree.flatten(structure)
     self.assertLen(flattened, 1)
-    unflattened = tree.pack_sequence_as("goodbye", flattened)
-    self.assertEqual(structure, unflattened)
+    self.assertEqual(structure, tree.unflatten_as("goodbye", flattened))
 
   def testFlatten_bytearrayIsNotFlattened(self):
     structure = bytearray("bytes in an array", "ascii")
     flattened = tree.flatten(structure)
     self.assertLen(flattened, 1)
     self.assertEqual(flattened, [structure])
-    unflattened = tree.pack_sequence_as(bytearray("hello", "ascii"), flattened)
-    self.assertEqual(structure, unflattened)
+    self.assertEqual(structure,
+                     tree.unflatten_as(bytearray("hello", "ascii"), flattened))
 
-  def testPackSequenceAs_notIterableError(self):
-    with self.assertRaisesRegexp(TypeError,
-                                 "flat_sequence must be a sequence"):
-      tree.pack_sequence_as("hi", "bye")
+  def testUnflattenSequenceAs_notIterableError(self):
+    with self.assertRaisesRegex(TypeError, "flat_sequence must be a sequence"):
+      tree.unflatten_as("hi", "bye")
 
-  def testPackSequenceAs_wrongLengthsError(self):
-    with self.assertRaisesRegexp(
+  def testUnflattenSequenceAs_wrongLengthsError(self):
+    with self.assertRaisesRegex(
         ValueError,
         "Structure had 2 elements, but flat_sequence had 3 elements."):
-      tree.pack_sequence_as(["hello", "world"],
-                            ["and", "goodbye", "again"])
+      tree.unflatten_as(["hello", "world"], ["and", "goodbye", "again"])
 
-  def testPackSequenceAs_defaultdict(self):
+  def testUnflattenSequenceAs_defaultdict(self):
     structure = collections.defaultdict(
         list, [("a", [None]), ("b", [None, None])])
     sequence = [1, 2, 3]
     expected = collections.defaultdict(
         list, [("a", [1]), ("b", [2, 3])])
-    self.assertEqual(expected, tree.pack_sequence_as(structure, sequence))
+    self.assertEqual(expected, tree.unflatten_as(structure, sequence))
 
   def testIsSequence(self):
     self.assertFalse(tree.is_nested("1234"))
@@ -244,23 +240,6 @@ class NestTest(parameterized.TestCase):
     self.assertFalse(tree.is_nested(ones))
     self.assertFalse(tree.is_nested(np.tanh(ones)))
     self.assertFalse(tree.is_nested(np.ones((4, 5))))
-
-  def testFlattenDictItems(self):
-    dictionary = {(4, 5, (6, 8)): ("a", "b", ("c", "d"))}
-    flat = {4: "a", 5: "b", 6: "c", 8: "d"}
-    self.assertEqual(tree.flatten_dict_items(dictionary), flat)
-
-    with self.assertRaises(TypeError):
-      tree.flatten_dict_items(4)
-
-    bad_dictionary = {(4, 5, (4, 8)): ("a", "b", ("c", "d"))}
-    with self.assertRaisesRegexp(ValueError, "not unique"):
-      tree.flatten_dict_items(bad_dictionary)
-
-    another_bad_dictionary = {(4, 5, (6, 8)): ("a", "b", ("c", ("d", "e")))}
-    with self.assertRaisesRegexp(
-        ValueError, "Key had [0-9]* elements, but value had [0-9]* elements"):
-      tree.flatten_dict_items(another_bad_dictionary)
 
   # pylint does not correctly recognize these as class names and
   # suggests to use variable style under_score naming.
@@ -278,6 +257,7 @@ class NestTest(parameterized.TestCase):
   class SameNamedType1(SameNameab):
     pass
 
+  # pylint: disable=g-error-prone-assert-raises
   def testAssertSameStructure(self):
     tree.assert_same_structure(STRUCTURE1, STRUCTURE2)
     tree.assert_same_structure("abc", 1.0)
@@ -287,7 +267,7 @@ class NestTest(parameterized.TestCase):
     tree.assert_same_structure("abc", np.array([0, 1]))
 
   def testAssertSameStructure_differentNumElements(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         ("The two structures don't have the same nested structure\\.\n\n"
          "First structure:.*?\n\n"
@@ -302,7 +282,7 @@ class NestTest(parameterized.TestCase):
       tree.assert_same_structure(STRUCTURE1, STRUCTURE_DIFFERENT_NUM_ELEMENTS)
 
   def testAssertSameStructure_listVsNdArray(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         ("The two structures don't have the same nested structure\\.\n\n"
          "First structure:.*?\n\n"
@@ -313,7 +293,7 @@ class NestTest(parameterized.TestCase):
       tree.assert_same_structure([0, 1], np.array([0, 1]))
 
   def testAssertSameStructure_intVsList(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         ("The two structures don't have the same nested structure\\.\n\n"
          "First structure:.*?\n\n"
@@ -328,7 +308,7 @@ class NestTest(parameterized.TestCase):
         TypeError, tree.assert_same_structure, (0, 1), [0, 1])
 
   def testAssertSameStructure_differentNesting(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         ("don't have the same nested structure\\.\n\n"
          "First structure: .*?\n\nSecond structure: ")):
@@ -347,7 +327,7 @@ class NestTest(parameterized.TestCase):
                       NestTest.Named0ab(3, 4), NestTest.Named1ab(3, 4))
 
   def testAssertSameStructure_sameNamedTupleDifferentStructuredContents(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         ("don't have the same nested structure\\.\n\n"
          "First structure: .*?\n\nSecond structure: ")):
@@ -355,7 +335,7 @@ class NestTest(parameterized.TestCase):
                                  NestTest.Named0ab([3], 4))
 
   def testAssertSameStructure_differentlyNestedLists(self):
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         ("don't have the same nested structure\\.\n\n"
          "First structure: .*?\n\nSecond structure: ")):
@@ -363,15 +343,13 @@ class NestTest(parameterized.TestCase):
 
   def testAssertSameStructure_listStructureWithAndWithoutTypes(self):
     structure1_list = [[[1, 2], 3], 4, [5, 6]]
-    with self.assertRaisesRegexp(TypeError,
-                                 "don't have the same sequence type"):
+    with self.assertRaisesRegex(TypeError, "don't have the same sequence type"):
       tree.assert_same_structure(STRUCTURE1, structure1_list)
     tree.assert_same_structure(STRUCTURE1, STRUCTURE2, check_types=False)
     tree.assert_same_structure(STRUCTURE1, structure1_list, check_types=False)
 
   def testAssertSameStructure_dictionaryDifferentKeys(self):
-    with self.assertRaisesRegexp(ValueError,
-                                 "don't have the same set of keys"):
+    with self.assertRaisesRegex(ValueError, "don't have the same set of keys"):
       tree.assert_same_structure({"a": 1}, {"b": 1})
 
   def testAssertSameStructure_sameNameNamedTuples(self):
@@ -387,7 +365,7 @@ class NestTest(parameterized.TestCase):
 
   def testAssertSameStructure_sameNameNamedTuplesDifferentStructure(self):
     expected_message = "The two structures don't have the same.*"
-    with self.assertRaisesRegexp(ValueError, expected_message):
+    with self.assertRaisesRegex(ValueError, expected_message):
       tree.assert_same_structure(
           NestTest.SameNameab(0, NestTest.SameNameab2(1, 2)),
           NestTest.SameNameab2(NestTest.SameNameab(0, 1), 2))
@@ -403,6 +381,7 @@ class NestTest(parameterized.TestCase):
   def testAssertSameStructure_classWrappingNamedTuple(self):
     self.assertRaises(TypeError, tree.assert_same_structure,
                       NestTest.SameNameab(0, 1), NestTest.SameNamedType1(2, 3))
+  # pylint: enable=g-error-prone-assert-raises
 
   def testMapStructure(self):
     structure2 = (((7, 8), 9), 10, (11, 12))
@@ -432,41 +411,39 @@ class NestTest(parameterized.TestCase):
     # This is checking actual equality of types, empty list != empty tuple
     self.assertNotEqual((), tree.map_structure(lambda x: x + 1, []))
 
-    with self.assertRaisesRegexp(TypeError, "callable"):
+    with self.assertRaisesRegex(TypeError, "callable"):
       tree.map_structure("bad", structure1_plus1)
 
-    with self.assertRaisesRegexp(ValueError, "at least one structure"):
+    with self.assertRaisesRegex(ValueError, "at least one structure"):
       tree.map_structure(lambda x: x)
 
-    with self.assertRaisesRegexp(ValueError, "same number of elements"):
+    with self.assertRaisesRegex(ValueError, "same number of elements"):
       tree.map_structure(lambda x, y: None, (3, 4), (3, 4, 5))
 
-    with self.assertRaisesRegexp(ValueError, "same nested structure"):
+    with self.assertRaisesRegex(ValueError, "same nested structure"):
       tree.map_structure(lambda x, y: None, 3, (3,))
 
-    with self.assertRaisesRegexp(TypeError, "same sequence type"):
+    with self.assertRaisesRegex(TypeError, "same sequence type"):
       tree.map_structure(lambda x, y: None, ((3, 4), 5), [(3, 4), 5])
 
-    with self.assertRaisesRegexp(ValueError, "same nested structure"):
+    with self.assertRaisesRegex(ValueError, "same nested structure"):
       tree.map_structure(lambda x, y: None, ((3, 4), 5), (3, (4, 5)))
 
     structure1_list = [[[1, 2], 3], 4, [5, 6]]
-    with self.assertRaisesRegexp(TypeError, "same sequence type"):
+    with self.assertRaisesRegex(TypeError, "same sequence type"):
       tree.map_structure(lambda x, y: None, STRUCTURE1, structure1_list)
 
     tree.map_structure(lambda x, y: None, STRUCTURE1, structure1_list,
                        check_types=False)
 
-    with self.assertRaisesRegexp(ValueError, "same nested structure"):
+    with self.assertRaisesRegex(ValueError, "same nested structure"):
       tree.map_structure(lambda x, y: None, ((3, 4), 5), (3, (4, 5)),
                          check_types=False)
 
-    with self.assertRaisesRegexp(ValueError,
-                                 "Only valid keyword argument.*foo"):
+    with self.assertRaisesRegex(ValueError, "Only valid keyword argument.*foo"):
       tree.map_structure(lambda x: None, STRUCTURE1, foo="a")
 
-    with self.assertRaisesRegexp(ValueError,
-                                 "Only valid keyword argument.*foo"):
+    with self.assertRaisesRegex(ValueError, "Only valid keyword argument.*foo"):
       tree.map_structure(lambda x: None, STRUCTURE1, check_types=False, foo="a")
 
   def testMapStructureWithStrings(self):
@@ -492,12 +469,12 @@ class NestTest(parameterized.TestCase):
   def testAssertShallowStructure(self):
     inp_ab = ["a", "b"]
     inp_abc = ["a", "b", "c"]
-    with self.assertRaisesRegexp(
+    with self.assertRaisesRegex(
         ValueError,
         tree._STRUCTURES_HAVE_MISMATCHING_LENGTHS.format(
             input_length=len(inp_ab),
             shallow_length=len(inp_abc))):
-      tree.assert_shallow_structure(inp_abc, inp_ab)
+      tree._assert_shallow_structure(inp_abc, inp_ab)
 
     inp_ab1 = [(1, 1), (2, 2)]
     inp_ab2 = [[1, 1], [2, 2]]
@@ -506,9 +483,9 @@ class NestTest(parameterized.TestCase):
         tree._STRUCTURES_HAVE_MISMATCHING_TYPES.format(
             shallow_type=type(inp_ab2[0]),
             input_type=type(inp_ab1[0]))):
-      tree.assert_shallow_structure(shallow_tree=inp_ab2, input_tree=inp_ab1)
+      tree._assert_shallow_structure(shallow_tree=inp_ab2, input_tree=inp_ab1)
 
-    tree.assert_shallow_structure(inp_ab2, inp_ab1, check_types=False)
+    tree._assert_shallow_structure(inp_ab2, inp_ab1, check_types=False)
 
     inp_ab1 = {"a": (1, 1), "b": {"c": (2, 2)}}
     inp_ab2 = {"a": (1, 1), "b": {"d": (2, 2)}}
@@ -516,14 +493,14 @@ class NestTest(parameterized.TestCase):
     with self.assertRaisesWithLiteralMatch(
         ValueError,
         tree._SHALLOW_TREE_HAS_INVALID_KEYS.format(["d"])):
-      tree.assert_shallow_structure(inp_ab2, inp_ab1)
+      tree._assert_shallow_structure(inp_ab2, inp_ab1)
 
     inp_ab = collections.OrderedDict([("a", 1), ("b", (2, 3))])
     inp_ba = collections.OrderedDict([("b", (2, 3)), ("a", 1)])
-    tree.assert_shallow_structure(inp_ab, inp_ba)
+    tree._assert_shallow_structure(inp_ab, inp_ba)
 
     # regression test for b/130633904
-    tree.assert_shallow_structure({0: "foo"}, ["foo"], check_types=False)
+    tree._assert_shallow_structure({0: "foo"}, ["foo"], check_types=False)
 
   def testFlattenUpTo(self):
     # Shallow tree ends at scalar.
@@ -687,10 +664,10 @@ class NestTest(parameterized.TestCase):
     flattened_structure = tree.flatten_up_to(structure, structure)
     self.assertEqual(structure, flattened_structure)
 
-  def testFlattenWithTuplePathsUpTo(self):
+  def testFlattenWithPathUpTo(self):
+
     def get_paths_and_values(shallow_tree, input_tree):
-      path_value_pairs = tree.flatten_with_tuple_paths_up_to(
-          shallow_tree, input_tree)
+      path_value_pairs = tree.flatten_with_path_up_to(shallow_tree, input_tree)
       paths = [p for p, _ in path_value_pairs]
       values = [v for _, v in path_value_pairs]
       return paths, values
@@ -715,8 +692,9 @@ class NestTest(parameterized.TestCase):
     (input_tree_flattened_as_shallow_tree_paths,
      input_tree_flattened_as_shallow_tree) = get_paths_and_values(shallow_tree,
                                                                   input_tree)
-    input_tree_flattened_paths = [p for p, _ in
-                                  tree.flatten_with_tuple_paths(input_tree)]
+    input_tree_flattened_paths = [
+        p for p, _ in tree.flatten_with_path(input_tree)
+    ]
     input_tree_flattened = tree.flatten(input_tree)
     self.assertEqual(input_tree_flattened_as_shallow_tree_paths,
                      [(0, 0), (0, 1, 0), (0, 1, 1, 0), (0, 1, 1, 1, 0)])
@@ -947,132 +925,11 @@ class NestTest(parameterized.TestCase):
         name_list, data_list)
     self.assertEqual(out, ["first_4_evens", ["first_5_odds", "first_3_primes"]])
 
-  def testApplyToStructureListToTuple(self):
-    data = [[], [1], [5, 6]]
-    tuple_data = tree.apply_to_structure(
-        branch_fn=lambda d: tuple(d) if isinstance(d, list) else d,
-        leaf_fn=lambda d: d,
-        structure=data)
-    self.assertEqual(tuple_data, ((), (1,), (5, 6)))
-
-  def testApplyToStructureListToDict(self):
-    data = [(1, 2), (3, 4), (5, 6)]
-    dict_data = tree.apply_to_structure(
-        branch_fn=lambda d: dict(d) if isinstance(d, list) else d,
-        leaf_fn=lambda d: d,
-        structure=data)
-    self.assertEqual(dict_data, {1: 2, 3: 4, 5: 6})
-
-  def testApplyToStructureEmptyTuple(self):
-    out = tree.apply_to_structure(lambda s: s, lambda s: s, structure=())
-    self.assertEqual(out, ())
-
-  def testApplyToStructureNone(self):
-    out = tree.apply_to_structure(lambda s: s, lambda s: s, structure=None)
-    self.assertEqual(out, None)
-
-  def testApplyToStructurePairToDictLeafPlusOne(self):
-    data = [(1, 1), (3, 3), (5, 5)]
-    dict_data = tree.apply_to_structure(
-        branch_fn=lambda d: {d[0]: d[1]} if isinstance(d, tuple) else d,
-        leaf_fn=lambda d: d+1,
-        structure=data)
-    self.assertEqual(dict_data, [{1: 2}, {3: 4}, {5: 6}])
-
-  def testApplyToStructureOrderedDictLeafPlusOne(self):
-    data = {"a": [1, [{"e": [2, [3, 4]]}, 3]], "b": {"c": 1, "d": [{1: 2}]}}
-
-    ord_dict = collections.OrderedDict
-    ordered_dict_data = tree.apply_to_structure(
-        branch_fn=lambda d: ord_dict(d) if isinstance(d, dict) else d,
-        leaf_fn=lambda d: d + 1,
-        structure=data)
-
-    self.assertEqual(
-        ordered_dict_data,
-        ord_dict({
-            "a": [2, [ord_dict({
-                "e": [3, [4, 5]]
-            }), 4]],
-            "b": ord_dict({
-                "c": 2,
-                "d": [{
-                    1: 3
-                }]
-            })
-        }))
-
-  def testGetTraverseShallowStructure(self):
-    scalar_traverse_input = [3, 4, (1, 2, [0]), [5, 6], {"a": (7,)}, []]
-    scalar_traverse_r = tree.get_traverse_shallow_structure(
-        lambda s: not isinstance(s, tuple), scalar_traverse_input)
-    self.assertEqual(scalar_traverse_r,
-                     [True, True, False, [True, True], {"a": False}, []])
-    tree.assert_shallow_structure(scalar_traverse_r,
-                                  scalar_traverse_input)
-
-    structure_traverse_input = [(1, [2]), ([1], 2)]
-    structure_traverse_r = tree.get_traverse_shallow_structure(
-        lambda s: (True, False) if isinstance(s, tuple) else True,
-        structure_traverse_input)
-    self.assertEqual(structure_traverse_r,
-                     [(True, False), ([True], False)])
-    tree.assert_shallow_structure(structure_traverse_r,
-                                  structure_traverse_input)
-
-    with self.assertRaisesRegexp(TypeError, "returned structure"):
-      tree.get_traverse_shallow_structure(lambda _: [True], 0)
-
-    with self.assertRaisesRegexp(TypeError, "returned a non-bool scalar"):
-      tree.get_traverse_shallow_structure(lambda _: 1, [1])
-
-    with self.assertRaisesRegexp(
-        TypeError, "didn't return a depth=1 structure of bools"):
-      tree.get_traverse_shallow_structure(lambda _: [1], [1])
-
-  @parameterized.parameters(
-      {"inputs": [], "expected": []},
-      {"inputs": 3, "expected": [()]},
-      {"inputs": [3], "expected": [(0,)]},
-      {"inputs": {"a": 3}, "expected": [("a",)]},
-      {"inputs": {"a": {"b": 4}}, "expected": [("a", "b")]},
-      {"inputs": [{"a": 2}], "expected": [(0, "a")]},
-      {"inputs": [{"a": [2]}], "expected": [(0, "a", 0)]},
-      {"inputs": [{"a": [(23, 42)]}],
-       "expected": [(0, "a", 0, 0), (0, "a", 0, 1)]},
-      {"inputs": [{"a": ([23], 42)}],
-       "expected": [(0, "a", 0, 0), (0, "a", 1)]},
-      {"inputs": {"a": {"a": 2}, "c": [[[4]]]},
-       "expected": [("a", "a"), ("c", 0, 0, 0)]},
-      {"inputs": {"0": [{"1": 23}]},
-       "expected": [("0", 0, "1")]}
-  )
-  def testYieldFlatStringPaths(self, inputs, expected):
-    self.assertEqual(list(tree.yield_flat_paths(inputs)), expected)
-
   # We cannot define namedtuples within @parameterized argument lists.
   # pylint: disable=invalid-name
   Foo = collections.namedtuple("Foo", ["a", "b"])
   Bar = collections.namedtuple("Bar", ["c", "d"])
   # pylint: enable=invalid-name
-
-  @parameterized.parameters([
-      dict(inputs=[], expected=[]),
-      dict(inputs=[23, "42"], expected=[("0", 23), ("1", "42")]),
-      dict(inputs=[[[[108]]]], expected=[("0/0/0/0", 108)]),
-      dict(inputs=Foo(a=3, b=Bar(c=23, d=42)),
-           expected=[("a", 3), ("b/c", 23), ("b/d", 42)]),
-      dict(inputs=Foo(a=Bar(c=23, d=42), b=Bar(c=0, d="thing")),
-           expected=[("a/c", 23), ("a/d", 42), ("b/c", 0), ("b/d", "thing")]),
-      dict(inputs=Bar(c=42, d=43),
-           expected=[("c", 42), ("d", 43)]),
-      dict(inputs=Bar(c=[42], d=43),
-           expected=[("c/0", 42), ("d", 43)]),
-  ])
-  def testFlattenWithStringPaths(self, inputs, expected):
-    self.assertEqual(
-        tree.flatten_with_joined_string_paths(inputs, separator="/"),
-        expected)
 
   @parameterized.parameters([
       dict(inputs=[], expected=[]),
@@ -1088,36 +945,8 @@ class NestTest(parameterized.TestCase):
       dict(inputs=Bar(c=[42], d=43),
            expected=[(("c", 0), 42), (("d",), 43)]),
   ])
-  def testFlattenWithTuplePaths(self, inputs, expected):
-    self.assertEqual(tree.flatten_with_tuple_paths(inputs), expected)
-
-  @parameterized.named_parameters(
-      ("tuples", (1, 2), (3, 4), True, ("0.4", "1.6")),
-      ("dicts", {"a": 1, "b": 2}, {"b": 4, "a": 3}, True,
-       {"a": "a.4", "b": "b.6"}),
-      ("mixed", (1, 2), [3, 4], False, ("0.4", "1.6")),
-      ("nested",
-       {"a": [2, 3], "b": [1, 2, 3]}, {"b": [5, 6, 7], "a": [8, 9]}, True,
-       {"a": ["a/0.10", "a/1.12"], "b": ["b/0.6", "b/1.8", "b/2.10"]}))
-  def testMapWithPathsCompatibleStructures(self, s1, s2, check_types, expected):
-    def format_sum(path, *values):
-      return "{0}.{1}".format(path, sum(values))
-    result = tree.map_structure_with_paths(format_sum, s1, s2,
-                                           check_types=check_types)
-    self.assertEqual(expected, result)
-
-  @parameterized.named_parameters(
-      ("tuples", (1, 2, 3), (4, 5), ValueError),
-      ("dicts", {"a": 1}, {"b": 2}, ValueError),
-      ("mixed", (1, 2), [3, 4], TypeError),
-      ("nested",
-       {"a": [2, 3, 4], "b": [1, 3]},
-       {"b": [5, 6], "a": [8, 9]},
-       ValueError
-      ))
-  def testMapWithPathsIncompatibleStructures(self, s1, s2, error_type):
-    with self.assertRaises(error_type):
-      tree.map_structure_with_paths(lambda path, *s: 0, s1, s2)
+  def testFlattenWithPath(self, inputs, expected):
+    self.assertEqual(tree.flatten_with_path(inputs), expected)
 
   @parameterized.named_parameters([
       dict(testcase_name="Tuples", s1=(1, 2), s2=(3, 4),
@@ -1133,11 +962,11 @@ class NestTest(parameterized.TestCase):
            expected={"a": [(("a", 0), 10), (("a", 1), 12)],
                      "b": [(("b", 0), 6), (("b", 1), 8), (("b", 2), 10)]}),
   ])
-  def testMapWithTuplePathsCompatibleStructures(
-      self, s1, s2, check_types, expected):
+  def testMapWithPathCompatibleStructures(self, s1, s2, check_types, expected):
     def path_and_sum(path, *values):
       return path, sum(values)
-    result = tree.map_structure_with_tuple_paths(
+
+    result = tree.map_structure_with_path(
         path_and_sum, s1, s2, check_types=check_types)
     self.assertEqual(expected, result)
 
@@ -1152,9 +981,9 @@ class NestTest(parameterized.TestCase):
            s2={"b": [5, 6], "a": [8, 9]},
            error_type=ValueError)
   ])
-  def testMapWithTuplePathsIncompatibleStructures(self, s1, s2, error_type):
+  def testMapWithPathIncompatibleStructures(self, s1, s2, error_type):
     with self.assertRaises(error_type):
-      tree.map_structure_with_tuple_paths(lambda path, *s: 0, s1, s2)
+      tree.map_structure_with_path(lambda path, *s: 0, s1, s2)
 
 
 if __name__ == "__main__":

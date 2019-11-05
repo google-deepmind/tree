@@ -39,20 +39,20 @@ structures with cycle references is undefined.
 
 .. autofunction:: assert_same_structure
 
-.. autofunction:: pack_sequence_as
+.. autofunction:: unflatten_as
 
 .. autofunction:: flatten
 
 .. autofunction:: flatten_up_to
 
-.. autofunction:: flatten_with_tuple_paths
+.. autofunction:: flatten_with_path
 
-.. autofunction:: flatten_with_tuple_paths_up_to
+.. autofunction:: flatten_with_path_up_to
 
 .. autofunction:: map_structure
 
 .. autofunction:: map_structure_up_to
 
-.. autofunction:: map_structure_with_tuple_paths
+.. autofunction:: map_structure_with_path
 
-.. autofunction:: map_structure_with_tuple_paths_up_to
+.. autofunction:: map_structure_with_path_up_to
