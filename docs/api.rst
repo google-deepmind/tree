@@ -10,10 +10,10 @@ is recursively defined as::
       Sequence['Structure'],
       Mapping[Any, 'Structure'],
       'AnyNamedTuple',
-      'AnyAttrsClass'
   ]
 
-.. TODO(slebedev): support @dataclass classes.
+.. TODO(slebedev): Support @dataclass classes if we make @attr.s
+.. support public.
 
 A single (non-nested) Python object is a perfectly valid structure::
 

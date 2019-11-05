@@ -214,7 +214,7 @@ def is_nested(structure):
 
   Returns:
     `True` if a given structure is nested, i.e. is a sequence, a mapping,
-    a namedtuple or an ``attr.s``-decorated class, and `False` otherwise.
+    or a namedtuple, and `False` otherwise.
   """
   return _tree.is_sequence(structure)
 
