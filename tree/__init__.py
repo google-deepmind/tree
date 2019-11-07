@@ -48,7 +48,7 @@ __all__ = [
     "map_structure_with_path_up_to",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 # Note: this is *not* the same as `six.string_types`, which in Python3 is just
 #       `(str,)` (i.e. it does not include byte strings).
