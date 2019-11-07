@@ -18,6 +18,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import posixpath
 import re
 import shutil
 
@@ -57,8 +58,8 @@ class BazelExtension(setuptools.Extension):
   def __init__(self, bazel_target):
     self.bazel_target = bazel_target
     self.relpath, self.target_name = (
-        os.path.relpath(bazel_target, '//').split(':'))
-    ext_name = os.path.join(self.relpath, self.target_name)
+        posixpath.relpath(bazel_target, '//').split(':'))
+    ext_name = posixpath.join(self.relpath, self.target_name)
     setuptools.Extension.__init__(self, ext_name, sources=[])
 
 
