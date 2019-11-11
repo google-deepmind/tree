@@ -21,6 +21,7 @@ import os
 import posixpath
 import re
 import shutil
+import sys
 
 from distutils import sysconfig
 import setuptools
@@ -28,6 +29,9 @@ from setuptools.command import build_ext
 
 
 here = os.path.dirname(os.path.abspath(__file__))
+
+
+IS_WINDOWS = sys.platform.startswith('win')
 
 
 def _get_tree_version():
@@ -59,7 +63,8 @@ class BazelExtension(setuptools.Extension):
     self.bazel_target = bazel_target
     self.relpath, self.target_name = (
         posixpath.relpath(bazel_target, '//').split(':'))
-    ext_name = posixpath.join(self.relpath, self.target_name)
+    ext_name = os.path.join(
+        self.relpath.replace(posixpath.sep, os.path.sep), self.target_name)
     setuptools.Extension.__init__(self, ext_name, sources=[])
 
 
@@ -78,22 +83,28 @@ class BuildBazelExtension(build_ext.build_ext):
     with open('WORKSPACE', 'w') as f:
       f.write(re.sub(
           r'(?<=path = ").*(?=",  # May be overwritten by setup\.py\.)',
-          sysconfig.get_python_inc(),
+          sysconfig.get_python_inc().replace(os.path.sep, posixpath.sep),
           workspace_contents))
 
     if not os.path.exists(self.build_temp):
       os.makedirs(self.build_temp)
 
-    shared_lib_suffix = '.' + sysconfig.get_config_var('SO').split('.')[-1]
-
-    self.spawn([
+    bazel_argv = [
         'bazel',
         'build',
-        ext.bazel_target + shared_lib_suffix,
+        ext.bazel_target,
         '--symlink_prefix=' + os.path.join(self.build_temp, 'bazel-'),
         '--compilation_mode=' + ('dbg' if self.debug else 'opt'),
-    ])
+    ]
 
+    if IS_WINDOWS:
+      # Link with python*.lib.
+      for library_dir in self.library_dirs:
+        bazel_argv.append('--linkopt=/LIBPATH:' + library_dir)
+
+    self.spawn(bazel_argv)
+
+    shared_lib_suffix = '.dll' if IS_WINDOWS else '.so'
     ext_bazel_bin_path = os.path.join(
         self.build_temp, 'bazel-bin',
         ext.relpath, ext.target_name + shared_lib_suffix)

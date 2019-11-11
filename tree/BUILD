@@ -4,7 +4,6 @@
 load(
     "//tree:build_defs.bzl",
     "tree_py_extension",
-    "tree_py_library",
     "tree_py_test",
 )
 
@@ -14,13 +13,13 @@ licenses(["notice"])
 
 exports_files(["LICENSE"])
 
-tree_py_library(
+py_library(
     name = "tree",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    tree_extension = ":_tree",
     visibility = ["//visibility:public"],
     deps = [
+        ":_tree",
         # six
     ],
 )

@@ -1,24 +1,32 @@
 """Open source rules for building the tree python extension."""
 
-def tree_py_extension(name, srcs, hdrs, copts, features, deps):
-    return native.cc_binary(
-        name = name + ".so",
-        linkshared = 1,
-        linkstatic = 1,
-        srcs = srcs + hdrs,
-        copts = copts,
-        features = features,
-        deps = deps,
-    )
+load("@bazel_skylib//lib:collections.bzl", "collections")
 
-def tree_py_library(name, srcs, srcs_version, tree_extension, visibility, deps = []):
+_SHARED_LIB_SUFFIX = {
+    "@//bazel:linux": ".so",
+    "@//bazel:apple": ".so",
+    "@//bazel:windows": ".dll",
+}
+
+def tree_py_extension(name, srcs, hdrs, copts, features, deps):
+    for shared_lib_suffix in collections.uniq(_SHARED_LIB_SUFFIX.values()):
+        shared_lib_name = name + shared_lib_suffix
+        native.cc_binary(
+            name = shared_lib_name,
+            linkshared = 1,
+            linkstatic = 1,
+            srcs = srcs + hdrs,
+            copts = copts,
+            features = features,
+            deps = deps,
+        )
+
     return native.py_library(
         name = name,
-        srcs = srcs,
-        srcs_version = srcs_version,
-        visibility = visibility,
-        data = [tree_extension.lstrip(":") + ".so"],
-        deps = deps,
+        data = select({
+            platform: [name + shared_lib_suffix]
+            for platform, shared_lib_suffix in _SHARED_LIB_SUFFIX.items()
+        }),
     )
 
 def tree_py_test(name, srcs, deps):
