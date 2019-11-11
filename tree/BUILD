@@ -3,8 +3,8 @@
 
 load(
     "//tree:build_defs.bzl",
-    "tree_py_library",
     "tree_py_extension",
+    "tree_py_library",
     "tree_py_test",
 )
 
