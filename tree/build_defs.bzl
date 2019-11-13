@@ -3,9 +3,9 @@
 load("@bazel_skylib//lib:collections.bzl", "collections")
 
 _SHARED_LIB_SUFFIX = {
-    "@//bazel:linux": ".so",
-    "@//bazel:apple": ".so",
-    "@//bazel:windows": ".dll",
+    "//bazel:linux": ".so",
+    "//bazel:apple": ".so",
+    "//bazel:windows": ".dll",
 }
 
 def tree_py_extension(name, srcs, hdrs, copts, features, deps):

@@ -17,7 +17,7 @@
 #   Helpers for setting up Bazel build environment.
 
 package(
-    default_visibility = ["@//:__subpackages__"],
+    default_visibility = ["//:__subpackages__"],
 )
 
 licenses(["notice"])  # Apache 2.0 License
