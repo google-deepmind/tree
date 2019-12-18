@@ -2,6 +2,11 @@
 Changelog
 #########
 
+Version 0.1.2
+=============
+
+* Added support for `wrapt.ObjectWrapper` objects.
+
 Version 0.1.1
 =============
 

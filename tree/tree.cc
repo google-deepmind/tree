@@ -208,6 +208,20 @@ py::object GetCollectionsMappingViewType() {
   return type;
 }
 
+py::object GetWraptObjectProxyTypeUncached() {
+  try {
+    return py::module::import("wrapt").attr("ObjectProxy");
+  } catch (const py::error_already_set& e) {
+    if (e.matches(PyExc_ImportError)) return py::none();
+    throw e;
+  }
+}
+
+py::object GetWraptObjectProxyType() {
+  static py::object type = GetWraptObjectProxyTypeUncached();
+  return type;
+}
+
 // Returns 1 if `o` is considered a mapping for the purposes of Flatten().
 // Returns 0 otherwise.
 // Returns -1 if an error occurred.
@@ -225,6 +239,17 @@ int IsMappingHelper(PyObject* o) {
 int IsMappingViewHelper(PyObject* o) {
   static auto* const check_cache = new CachedTypeCheck([](PyObject* to_check) {
     return PyObject_IsInstance(to_check, GetCollectionsMappingViewType().ptr());
+  });
+  return check_cache->CachedLookup(o);
+}
+
+// Returns 1 if `o` is considered an object proxy
+// Returns 0 otherwise.
+// Returns -1 if an error occurred.
+int IsObjectProxy(PyObject* o) {
+  static auto* const check_cache = new CachedTypeCheck([](PyObject* to_check) {
+    auto type = GetWraptObjectProxyType();
+    return !type.is_none() && PyObject_IsInstance(to_check, type.ptr()) == 1;
   });
   return check_cache->CachedLookup(o);
 }
@@ -520,6 +545,18 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
   if (!is_seq1) return true;
 
   if (check_types) {
+    // Unwrap wrapt.ObjectProxy if needed.
+    Safe_PyObjectPtr o1_wrapped;
+    if (IsObjectProxy(o1)) {
+      o1_wrapped.reset(PyObject_GetAttrString(o1, "__wrapped__"));
+      o1 = o1_wrapped.get();
+    }
+    Safe_PyObjectPtr o2_wrapped;
+    if (IsObjectProxy(o2)) {
+      o2_wrapped.reset(PyObject_GetAttrString(o2, "__wrapped__"));
+      o2 = o2_wrapped.get();
+    }
+
     const PyTypeObject* type1 = o1->ob_type;
     const PyTypeObject* type2 = o2->ob_type;
 
@@ -652,6 +689,13 @@ PyObject* Flatten(PyObject* nested) {
 }
 
 PyObject* IsNamedtuple(PyObject* o, bool strict) {
+  // Unwrap wrapt.ObjectProxy if needed.
+  Safe_PyObjectPtr o_wrapped;
+  if (IsObjectProxy(o)) {
+    o_wrapped.reset(PyObject_GetAttrString(o, "__wrapped__"));
+    o = o_wrapped.get();
+  }
+
   // Must be subclass of tuple
   if (!PyTuple_Check(o)) {
     Py_RETURN_FALSE;

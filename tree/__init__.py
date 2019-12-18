@@ -27,6 +27,13 @@ from six.moves import map
 from six.moves import zip
 
 try:
+  import wrapt  # pylint: disable=g-import-not-at-top
+  ObjectProxy = wrapt.ObjectProxy
+except ImportError:
+  class ObjectProxy(object):
+    """Stub-class for `wrapt.ObjectProxy``."""
+
+try:
   from tree import _tree  # pylint: disable=g-import-not-at-top
 except ImportError:
   if "sphinx" not in sys.modules:
@@ -48,7 +55,7 @@ __all__ = [
     "map_structure_with_path_up_to",
 ]
 
-__version__ = "0.1.1"
+__version__ = "0.1.2dev"
 
 # Note: this is *not* the same as `six.string_types`, which in Python3 is just
 #       `(str,)` (i.e. it does not include byte strings).
@@ -149,7 +156,15 @@ def _sequence_like(instance, args):
     # We can't directly construct mapping views, so we create a list instead
     return list(args)
   elif _is_namedtuple(instance) or _is_attrs(instance):
-    return type(instance)(*args)
+    if isinstance(instance, ObjectProxy):
+      instance_type = type(instance.__wrapped__)
+    else:
+      instance_type = type(instance)
+    return instance_type(*args)
+  elif isinstance(instance, ObjectProxy):
+    # For object proxies, first create the underlying type and then re-wrap it
+    # in the proxy type.
+    return type(instance)(_sequence_like(instance.__wrapped__, args))
   else:
     # Not a namedtuple
     return type(instance)(args)
@@ -586,7 +601,12 @@ def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
       raise TypeError(_IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ.format(
           type(input_tree)))
 
-    if check_types and not isinstance(input_tree, type(shallow_tree)):
+    if isinstance(shallow_tree, ObjectProxy):
+      shallow_type = type(shallow_tree.__wrapped__)
+    else:
+      shallow_type = type(shallow_tree)
+
+    if check_types and not isinstance(input_tree, shallow_type):
       # Duck-typing means that nest should be fine with two different
       # namedtuples with identical name and fields.
       shallow_is_namedtuple = _is_namedtuple(shallow_tree, False)
@@ -596,13 +616,13 @@ def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
         if not _tree.same_namedtuples(shallow_tree, input_tree):
           raise TypeError(_STRUCTURES_HAVE_MISMATCHING_TYPES.format(
               input_type=type(input_tree),
-              shallow_type=type(shallow_tree)))
+              shallow_type=shallow_type))
         # pylint: enable=protected-access
       elif not (isinstance(shallow_tree, collections.Mapping)
                 and isinstance(input_tree, collections.Mapping)):
         raise TypeError(_STRUCTURES_HAVE_MISMATCHING_TYPES.format(
             input_type=type(input_tree),
-            shallow_type=type(shallow_tree)))
+            shallow_type=shallow_type))
 
     if _num_elements(input_tree) != _num_elements(shallow_tree):
       raise ValueError(

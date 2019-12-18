@@ -51,6 +51,7 @@ tree_py_test(
         # absl/testing:parameterized
         # attr
         # numpy
+        # wrapt
     ],
 )
 

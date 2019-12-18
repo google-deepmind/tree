@@ -25,8 +25,8 @@ import unittest
 from absl.testing import parameterized
 import attr
 import numpy as np
-
 import tree
+import wrapt
 
 STRUCTURE1 = (((1, 2), 3), 4, (5, 6))
 STRUCTURE2 = ((("foo1", "foo2"), "foo3"), "foo4", ("foo5", "foo6"))
@@ -78,6 +78,8 @@ class NestTest(parameterized.TestCase):
       ({"B": 10, "A": 20}, [1, 2], 3),
       ((1, 2), [3, 4], 5),
       (collections.namedtuple("Point", ["x", "y"])(1, 2), 3, 4),
+      wrapt.ObjectProxy(
+          (collections.namedtuple("Point", ["x", "y"])(1, 2), 3, 4))
   ])
   def testAttrsMapStructure(self, *field_values):
     @attr.s
@@ -943,6 +945,8 @@ class NestTest(parameterized.TestCase):
       dict(inputs=Bar(c=42, d=43),
            expected=[(("c",), 42), (("d",), 43)]),
       dict(inputs=Bar(c=[42], d=43),
+           expected=[(("c", 0), 42), (("d",), 43)]),
+      dict(inputs=wrapt.ObjectProxy(Bar(c=[42], d=43)),
            expected=[(("c", 0), 42), (("d",), 43)]),
   ])
   def testFlattenWithPath(self, inputs, expected):
