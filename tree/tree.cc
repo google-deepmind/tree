@@ -14,8 +14,7 @@ limitations under the License.
 ==============================================================================*/
 #include "tree/tree.h"
 
-#include <memory>  // NOLINT
-#include <mutex>   // NOLINT
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -26,7 +25,6 @@ limitations under the License.
 #include "absl/strings/string_view.h"
 
 #include "pybind11/pybind11.h"
-#include "pybind11/pytypes.h"
 
 #ifdef LOG
 #define LOG_WARNING(w) LOG(WARNING) << w;
@@ -138,7 +136,6 @@ class CachedTypeCheck {
       : ternary_predicate_(std::move(ternary_predicate)) {}
 
   ~CachedTypeCheck() {
-    std::lock_guard<std::mutex> guard(type_to_sequence_map_mu_);
     for (const auto& pair : type_to_sequence_map_) {
       Py_DECREF(pair.first);
     }
@@ -152,11 +149,9 @@ class CachedTypeCheck {
   int CachedLookup(PyObject* o) {
     // Try not to return to Python - see if the type has already been seen
     // before.
-
     auto* type = Py_TYPE(o);
 
     {
-      std::lock_guard<std::mutex> guard(type_to_sequence_map_mu_);
       auto it = type_to_sequence_map_.find(type);
       if (it != type_to_sequence_map_.end()) {
         return it->second;
@@ -176,7 +171,6 @@ class CachedTypeCheck {
     // that are eligible for decref. As a precaution, we limit the size of the
     // map to 1024.
     {
-      std::lock_guard<std::mutex> guard(type_to_sequence_map_mu_);
       if (type_to_sequence_map_.size() < kMaxItemsInCache) {
         Py_INCREF(type);
         type_to_sequence_map_.insert({type, check_result});
@@ -188,7 +182,6 @@ class CachedTypeCheck {
 
  private:
   std::function<int(PyObject*)> ternary_predicate_;
-  std::mutex type_to_sequence_map_mu_;
   std::unordered_map<PyTypeObject*, bool> type_to_sequence_map_;
 };
 
