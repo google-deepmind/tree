@@ -39,20 +39,18 @@ limitations under the License.
 namespace py = pybind11;
 
 namespace tree {
+namespace {
 
-struct PyDecrefDeleter {
+struct DecrementsPyRefcount {
   void operator()(PyObject* p) const { Py_DECREF(p); }
 };
 
-// Safe container for an owned PyObject. On destruction, the reference count of
-// the contained object will be decremented.
-using Safe_PyObjectPtr = std::unique_ptr<PyObject, PyDecrefDeleter>;
-
-Safe_PyObjectPtr make_safe(PyObject* object) {
-  return Safe_PyObjectPtr(object);
-}
-
-namespace {
+// PyObjectPtr wraps an underlying Python object and decrements the
+// reference count in the destructor.
+//
+// This class does not acquire the GIL in the destructor, so the GIL must be
+// held when the destructor is called.
+using PyObjectPtr = std::unique_ptr<PyObject, DecrementsPyRefcount>;
 
 const int kMaxItemsInCache = 1024;
 
@@ -79,7 +77,7 @@ PyObject* MappingKeys(PyObject* o) {
   return PyMapping_Keys(o);
 #else
   static char key_method_name[] = "keys";
-  Safe_PyObjectPtr raw_result(PyObject_CallMethod(o, key_method_name, nullptr));
+  PyObjectPtr raw_result(PyObject_CallMethod(o, key_method_name, nullptr));
   if (PyErr_Occurred() || raw_result.get() == nullptr) {
     return nullptr;
   }
@@ -250,7 +248,7 @@ int IsObjectProxy(PyObject* o) {
 // Returns 0 otherwise.
 int IsAttrsHelper(PyObject* o) {
   static auto* const check_cache = new CachedTypeCheck([](PyObject* to_check) {
-    Safe_PyObjectPtr cls(PyObject_GetAttrString(to_check, "__class__"));
+    PyObjectPtr cls(PyObject_GetAttrString(to_check, "__class__"));
     if (cls) {
       return PyObject_HasAttrString(cls.get(), "__attrs_attrs__");
     }
@@ -292,7 +290,7 @@ int IsSequenceHelper(PyObject* o) {
 class ValueIterator {
  public:
   virtual ~ValueIterator() {}
-  virtual Safe_PyObjectPtr next() = 0;
+  virtual PyObjectPtr next() = 0;
 
   bool valid() const { return is_valid_; }
 
@@ -321,9 +319,9 @@ class DictValueIterator : public ValueIterator {
     }
   }
 
-  Safe_PyObjectPtr next() override {
-    Safe_PyObjectPtr result;
-    Safe_PyObjectPtr key(PyIter_Next(iter_.get()));
+  PyObjectPtr next() override {
+    PyObjectPtr result;
+    PyObjectPtr key(PyIter_Next(iter_.get()));
     if (key) {
       // PyDict_GetItem returns a borrowed reference.
       PyObject* elem = PyDict_GetItem(dict_, key.get());
@@ -340,8 +338,8 @@ class DictValueIterator : public ValueIterator {
 
  private:
   PyObject* dict_;
-  Safe_PyObjectPtr keys_;
-  Safe_PyObjectPtr iter_;
+  PyObjectPtr keys_;
+  PyObjectPtr iter_;
 };
 
 // Iterate over mapping objects by sorting the keys first
@@ -356,9 +354,9 @@ class MappingValueIterator : public ValueIterator {
     }
   }
 
-  Safe_PyObjectPtr next() override {
-    Safe_PyObjectPtr result;
-    Safe_PyObjectPtr key(PyIter_Next(iter_.get()));
+  PyObjectPtr next() override {
+    PyObjectPtr result;
+    PyObjectPtr key(PyIter_Next(iter_.get()));
     if (key) {
       // Unlike PyDict_GetItem, PyObject_GetItem returns a new reference.
       PyObject* elem = PyObject_GetItem(mapping_, key.get());
@@ -374,8 +372,8 @@ class MappingValueIterator : public ValueIterator {
 
  private:
   PyObject* mapping_;
-  Safe_PyObjectPtr keys_;
-  Safe_PyObjectPtr iter_;
+  PyObjectPtr keys_;
+  PyObjectPtr iter_;
 };
 
 // Iterate over a sequence, by index.
@@ -386,8 +384,8 @@ class SequenceValueIterator : public ValueIterator {
         size_(seq_.get() ? PySequence_Fast_GET_SIZE(seq_.get()) : 0),
         index_(0) {}
 
-  Safe_PyObjectPtr next() override {
-    Safe_PyObjectPtr result;
+  PyObjectPtr next() override {
+    PyObjectPtr result;
     if (index_ < size_) {
       // PySequence_Fast_GET_ITEM returns a borrowed reference.
       PyObject* elem = PySequence_Fast_GET_ITEM(seq_.get(), index_);
@@ -402,7 +400,7 @@ class SequenceValueIterator : public ValueIterator {
   }
 
  private:
-  Safe_PyObjectPtr seq_;
+  PyObjectPtr seq_;
   const Py_ssize_t size_;
   Py_ssize_t index_;
 };
@@ -421,11 +419,11 @@ class AttrsValueIterator : public ValueIterator {
     if (!iter_ || PyErr_Occurred()) invalidate();
   }
 
-  Safe_PyObjectPtr next() override {
-    Safe_PyObjectPtr result;
-    Safe_PyObjectPtr item(PyIter_Next(iter_.get()));
+  PyObjectPtr next() override {
+    PyObjectPtr result;
+    PyObjectPtr item(PyIter_Next(iter_.get()));
     if (item) {
-      Safe_PyObjectPtr name(PyObject_GetAttrString(item.get(), "name"));
+      PyObjectPtr name(PyObject_GetAttrString(item.get(), "name"));
       result.reset(PyObject_GetAttr(nested_.get(), name.get()));
     }
 
@@ -433,10 +431,10 @@ class AttrsValueIterator : public ValueIterator {
   }
 
  private:
-  Safe_PyObjectPtr nested_;
-  Safe_PyObjectPtr cls_;
-  Safe_PyObjectPtr attrs_;
-  Safe_PyObjectPtr iter_;
+  PyObjectPtr nested_;
+  PyObjectPtr cls_;
+  PyObjectPtr attrs_;
+  PyObjectPtr iter_;
 };
 
 ValueIteratorPtr GetValueIterator(PyObject* nested) {
@@ -465,7 +463,7 @@ bool FlattenHelper(
   ValueIteratorPtr iter = value_iterator_getter(nested);
   if (!iter->valid()) return false;
 
-  for (Safe_PyObjectPtr item = iter->next(); item; item = iter->next()) {
+  for (PyObjectPtr item = iter->next(); item; item = iter->next()) {
     if (Py_EnterRecursiveCall(" in flatten")) {
       return false;
     }
@@ -483,14 +481,14 @@ bool FlattenHelper(
 // 'dict1' and 'dict2' are assumed to be Python dictionaries.
 void SetDifferentKeysError(PyObject* dict1, PyObject* dict2,
                            std::string* error_msg, bool* is_type_error) {
-  Safe_PyObjectPtr k1(MappingKeys(dict1));
+  PyObjectPtr k1(MappingKeys(dict1));
   if (PyErr_Occurred() || k1.get() == nullptr) {
     *error_msg =
         ("The two dictionaries don't have the same set of keys. Failed to "
          "fetch keys.");
     return;
   }
-  Safe_PyObjectPtr k2(MappingKeys(dict2));
+  PyObjectPtr k2(MappingKeys(dict2));
   if (PyErr_Occurred() || k2.get() == nullptr) {
     *error_msg =
         ("The two dictionaries don't have the same set of keys. Failed to "
@@ -538,12 +536,12 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
 
   if (check_types) {
     // Unwrap wrapt.ObjectProxy if needed.
-    Safe_PyObjectPtr o1_wrapped;
+    PyObjectPtr o1_wrapped;
     if (IsObjectProxy(o1)) {
       o1_wrapped.reset(PyObject_GetAttrString(o1, "__wrapped__"));
       o1 = o1_wrapped.get();
     }
-    Safe_PyObjectPtr o2_wrapped;
+    PyObjectPtr o2_wrapped;
     if (IsObjectProxy(o2)) {
       o2_wrapped.reset(PyObject_GetAttrString(o2, "__wrapped__"));
       o2 = o2_wrapped.get();
@@ -620,7 +618,7 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
         return true;
       }
 
-      Safe_PyObjectPtr iter(PyObject_GetIter(o1));
+      PyObjectPtr iter(PyObject_GetIter(o1));
       PyObject* key;
       while ((key = PyIter_Next(iter.get())) != nullptr) {
         if (!PyMapping_HasKey(o2, key)) {
@@ -639,8 +637,8 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
   if (!iter1->valid() || !iter2->valid()) return false;
 
   while (true) {
-    Safe_PyObjectPtr v1 = iter1->next();
-    Safe_PyObjectPtr v2 = iter2->next();
+    PyObjectPtr v1 = iter1->next();
+    PyObjectPtr v2 = iter2->next();
     if (v1 && v2) {
       if (Py_EnterRecursiveCall(" in assert_same_structure")) {
         return false;
@@ -682,7 +680,7 @@ PyObject* Flatten(PyObject* nested) {
 
 PyObject* IsNamedtuple(PyObject* o, bool strict) {
   // Unwrap wrapt.ObjectProxy if needed.
-  Safe_PyObjectPtr o_wrapped;
+  PyObjectPtr o_wrapped;
   if (IsObjectProxy(o)) {
     o_wrapped.reset(PyObject_GetAttrString(o, "__wrapped__"));
     o = o_wrapped.get();
@@ -717,7 +715,7 @@ PyObject* IsNamedtuple(PyObject* o, bool strict) {
     Py_RETURN_FALSE;
   }
 
-  Safe_PyObjectPtr fields = make_safe(PyObject_GetAttrString(o, "_fields"));
+  PyObjectPtr fields(PyObject_GetAttrString(o, "_fields"));
   int is_instance =
       PyObject_IsInstance(fields.get(), GetCollectionsSequenceType().ptr());
   if (is_instance == 0) {
@@ -726,7 +724,7 @@ PyObject* IsNamedtuple(PyObject* o, bool strict) {
     return nullptr;
   }
 
-  Safe_PyObjectPtr seq = make_safe(PySequence_Fast(fields.get(), ""));
+  PyObjectPtr seq(PySequence_Fast(fields.get(), ""));
   const Py_ssize_t s = PySequence_Fast_GET_SIZE(seq.get());
   for (Py_ssize_t i = 0; i < s; ++i) {
     // PySequence_Fast_GET_ITEM returns borrowed ref
