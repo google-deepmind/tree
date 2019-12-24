@@ -35,7 +35,6 @@ tree_py_extension(
     features = ["-use_header_modules"],
     deps = [
         # base,
-        "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/memory",
         "@abseil-cpp//absl/strings",
         "@pybind11_archive//:pybind11",

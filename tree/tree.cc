@@ -19,7 +19,6 @@ limitations under the License.
 #include <unordered_map>
 
 // logging
-#include "absl/base/optimization.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
