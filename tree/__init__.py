@@ -34,6 +34,15 @@ except ImportError:
     """Stub-class for `wrapt.ObjectProxy``."""
 
 try:
+  # pylint: disable=g-import-not-at-top
+  from typing import Any, Mapping, Sequence, Union, Text, TypeVar
+  # pylint: enable=g-import-not-at-top
+except ImportError:
+  typing_available = False
+else:
+  typing_available = True
+
+try:
   from tree import _tree  # pylint: disable=g-import-not-at-top
 except ImportError:
   if "sphinx" not in sys.modules:
@@ -83,6 +92,22 @@ _INPUT_TREE_SMALLER_THAN_SHALLOW_TREE = (
 _IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ = (
     "If shallow structure is a sequence, input must also be a sequence. "
     "Input has type: {}.")
+
+if typing_available:
+  K = TypeVar("K")
+  V = TypeVar("V")
+  # A generic monomorphic structure type, e.g. ``StructureKV[Text, int]``
+  # is an arbitrarily nested structure where keys must be of type ``Text``
+  # and values are integers.
+  # pytype: disable=not-supported-yet
+  StructureKV = Union[
+      Sequence["StructureKV[K, V]"],
+      Mapping[K, "StructureKV[K, V]"],
+      V,
+  ]
+  # pytype: enable=not-supported-yet
+  # A specialization of ``StructureKV`` for the common case of ``Text`` keys.
+  Structure = StructureKV[Text, V]
 
 
 def _get_attrs_items(obj):
