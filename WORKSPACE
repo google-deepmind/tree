@@ -10,7 +10,7 @@ http_archive(
 )
 
 http_archive(
-    name = "abseil-cpp",
+    name = "com_google_absl",
     sha256 = "583e5801372a0bb12eb561858532e3bb9a3528f15f65cfc87b2c0f4c1ab1a0ca",
     strip_prefix = "abseil-cpp-111ca7060a6ff50115ca85b59f6b5d8c8c5e9105",
     urls = [
