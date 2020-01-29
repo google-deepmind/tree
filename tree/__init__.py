@@ -107,7 +107,13 @@ if typing_available:
   ]
   # pytype: enable=not-supported-yet
   # A specialization of ``StructureKV`` for the common case of ``Text`` keys.
-  Structure = StructureKV[Text, V]
+  try:
+    Structure = StructureKV[Text, V]
+  except TypeError:
+    # Older Python 3.5 and 3.6 releases do not always support such use
+    # of generics. Specialize ``StructureKV`` manually.
+    Structure = Union[Sequence["Structure[V]"], Mapping[Text, "Structure[V]"],
+                      V]
 
 
 def _get_attrs_items(obj):

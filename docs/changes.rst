@@ -5,7 +5,8 @@ Changelog
 Version 0.1.2
 =============
 
-* Added support for `wrapt.ObjectWrapper` objects.
+* Added support for ``wrapt.ObjectWrapper`` objects.
+* Added ``StructureKV[K, V]`` and ``Structure = Structure[Text, V]`` types.
 
 Version 0.1.1
 =============
