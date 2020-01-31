@@ -2,6 +2,13 @@
 Changelog
 #########
 
+Version 0.1.3
+=============
+
+Release 2020-01-30
+
+* Fixed ``ImportError`` when ``wrapt`` was not available.
+
 Version 0.1.2
 =============
 
