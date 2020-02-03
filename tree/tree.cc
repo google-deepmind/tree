@@ -790,6 +790,10 @@ inline py::object pyo_or_throw(PyObject* ptr) {
 }
 
 PYBIND11_MODULE(_tree, m) {
+  // Resolve `wrapt.ObjectProxy` at import time to avoid doing
+  // imports during function calls.
+  tree::GetWraptObjectProxyType();
+
   m.def("assert_same_structure",
         [](py::handle& o1, py::handle& o2, bool check_types) {
           tree::AssertSameStructure(o1.ptr(), o2.ptr(), check_types);
