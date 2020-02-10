@@ -100,6 +100,7 @@ if typing_available:
   # is an arbitrarily nested structure where keys must be of type ``Text``
   # and values are integers.
   # pytype: disable=not-supported-yet
+  # TODO(b/146184840): Remove pytype disable when recursive types supported
   StructureKV = Union[
       Sequence["StructureKV[K, V]"],
       Mapping[K, "StructureKV[K, V]"],
