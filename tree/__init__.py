@@ -21,6 +21,7 @@ from __future__ import print_function
 
 import collections
 import sys
+import types
 
 import six
 from six.moves import map
@@ -182,6 +183,9 @@ def _sequence_like(instance, args):
     if isinstance(instance, collections.defaultdict):
       # `defaultdict` requires a default factory as the first argument.
       return type(instance)(instance.default_factory, keys_and_values)
+    elif six.PY3 and isinstance(instance, types.MappingProxyType):
+      # MappingProxyType requires a dict to proxy to.
+      return type(instance)(dict(keys_and_values))
     else:
       return type(instance)(keys_and_values)
   elif isinstance(instance, collections.MappingView):

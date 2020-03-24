@@ -20,11 +20,13 @@ from __future__ import print_function
 
 import collections
 import doctest
+import types
 import unittest
 
 from absl.testing import parameterized
 import attr
 import numpy as np
+import six
 import tree
 import wrapt
 
@@ -989,6 +991,15 @@ class NestTest(parameterized.TestCase):
     with self.assertRaises(error_type):
       tree.map_structure_with_path(lambda path, *s: 0, s1, s2)
 
+  def testMappingProxyType(self):
+    if six.PY2:
+      self.skipTest("Python 2 does not support mapping proxy type.")
+
+    structure = types.MappingProxyType({"a": 1, "b": (2, 3)})
+    expected = types.MappingProxyType({"a": 4, "b": (5, 6)})
+    self.assertEqual(tree.flatten(structure), [1, 2, 3])
+    self.assertEqual(tree.unflatten_as(structure, [4, 5, 6]), expected)
+    self.assertEqual(tree.map_structure(lambda v: v + 3, structure), expected)
 
 if __name__ == "__main__":
   unittest.main()
