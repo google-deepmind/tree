@@ -2,10 +2,17 @@
 Changelog
 #########
 
+Version 0.1.4
+=============
+
+Release 2020-03-27
+
+* Added support for ``types.MappingProxyType`` on Python 3.X.
+
 Version 0.1.3
 =============
 
-Release 2020-01-30
+Released 2020-01-30
 
 * Fixed ``ImportError`` when ``wrapt`` was not available.
 
