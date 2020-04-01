@@ -1001,5 +1001,28 @@ class NestTest(parameterized.TestCase):
     self.assertEqual(tree.unflatten_as(structure, [4, 5, 6]), expected)
     self.assertEqual(tree.map_structure(lambda v: v + 3, structure), expected)
 
+  def testTraverseListsToTuples(self):
+    structure = [(1, 2), [3], {"a": [4]}]
+    self.assertEqual(
+        ((1, 2), (3,), {"a": (4,)}),
+        tree.traverse(
+            lambda x: tuple(x) if isinstance(x, list) else x,
+            structure,
+            top_down=False))
+
+  def testTraverseEarlyTermination(self):
+    structure = [(1, [2]), [3, (4, 5, 6)]]
+    visited = []
+    def visit(x):
+      visited.append(x)
+      return "X" if isinstance(x, tuple) and len(x) > 2 else None
+
+    output = tree.traverse(visit, structure)
+    self.assertEqual([(1, [2]), [3, "X"]], output)
+    self.assertEqual(
+        [[(1, [2]), [3, (4, 5, 6)]],
+         (1, [2]), 1, [2], 2, [3, (4, 5, 6)], 3, (4, 5, 6)],
+        visited)
+
 if __name__ == "__main__":
   unittest.main()

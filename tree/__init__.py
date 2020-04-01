@@ -20,6 +20,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import functools
 import sys
 import types
 
@@ -63,6 +64,7 @@ __all__ = [
     "map_structure_up_to",
     "map_structure_with_path",
     "map_structure_with_path_up_to",
+    "traverse",
 ]
 
 __version__ = "0.1.4"
@@ -876,3 +878,72 @@ def flatten_with_path(structure):
     TypeError: If `structure` is or contains a mapping with non-sortable keys.
   """
   return list(_yield_flat_up_to(structure, structure))
+
+
+# Special value for use with `traverse`. See `traverse` docstring.
+MAP_TO_NONE = object()
+
+
+def traverse(fn, structure, top_down=True):
+  """Traverses the given nested structure, applying the given function.
+
+  The traversal is depth-first. If `top_down` is True (default), parents are
+  returned before their children (giving the option to avoid traversing into a
+  sub-tree).
+
+  >>> visited = []
+  >>> traverse(visited.append, [(1, 2), [3], {"a": 4}], top_down=True)
+  [(1, 2), [3], {'a': 4}]
+  >>> visited
+  [[(1, 2), [3], {'a': 4}], (1, 2), 1, 2, [3], 3, {'a': 4}, 4]
+
+  >>> visited = []
+  >>> traverse(visited.append, [(1, 2), [3], {"a": 4}], top_down=False)
+  [(1, 2), [3], {'a': 4}]
+  >>> visited
+  [1, 2, (1, 2), 3, [3], 4, {'a': 4}, [(1, 2), [3], {'a': 4}]]
+
+  Args:
+    fn: The function to be applied to each sub-nest of the structure.
+      When traversing top-down:
+        If `fn(subtree) == None` the traversal continues into the sub-tree.
+        If `fn(subtree) != None` the traversal does not continue into the
+        sub-tree. The sub-tree will be replaced by `fn(subtree)` in the
+        returned structure (to replace the sub-tree with `None`, use the special
+        value `MAP_TO_NONE`).
+      When traversing bottom-up:
+        If `fn(subtree) == None` the traversed sub-tree is returned unaltered.
+        If `fn(subtree) != None` the sub-tree will be replaced by `fn(subtree)`
+        in the returned structure (to replace the sub-tree with `None`, use the
+        special value `MAP_TO_NONE`).
+    structure: The structure to traverse.
+    top_down: If `True`, parent structures will be visited before their
+      children.
+
+  Returns:
+    The structured output from the traversal.
+  """
+  def traverse_subtrees():
+    if is_nested(structure):
+      part_fn = functools.partial(traverse, fn, top_down=top_down)
+      return _sequence_like(structure, map(part_fn, _yield_value(structure)))
+    else:
+      return structure
+
+  if top_down:
+    ret = fn(structure)
+    if ret is None:
+      return traverse_subtrees()
+    elif ret is MAP_TO_NONE:
+      return None
+    else:
+      return ret
+  else:
+    traversed_structure = traverse_subtrees()
+    ret = fn(traversed_structure)
+    if ret is None:
+      return traversed_structure
+    elif ret is MAP_TO_NONE:
+      return None
+    else:
+      return ret
