@@ -56,3 +56,7 @@ structures with cycle references is undefined.
 .. autofunction:: map_structure_with_path
 
 .. autofunction:: map_structure_with_path_up_to
+
+.. autofunction:: traverse
+
+.. autodata:: MAP_TO_NONE

@@ -2,10 +2,18 @@
 Changelog
 #########
 
+Version 0.1.5
+=============
+
+Released 2020-04-30
+
+* Added a new function ``tree.traverse`` which allows to traverse a nested
+  structure and apply a function to each subtree.
+
 Version 0.1.4
 =============
 
-Release 2020-03-27
+Released 2020-03-27
 
 * Added support for ``types.MappingProxyType`` on Python 3.X.
 

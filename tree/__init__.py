@@ -65,9 +65,10 @@ __all__ = [
     "map_structure_with_path",
     "map_structure_with_path_up_to",
     "traverse",
+    "MAP_TO_NONE",
 ]
 
-__version__ = "0.1.4"
+__version__ = "0.1.5"
 
 # Note: this is *not* the same as `six.string_types`, which in Python3 is just
 #       `(str,)` (i.e. it does not include byte strings).
@@ -875,50 +876,53 @@ def flatten_with_path(structure):
     of the input `structure`.
 
   Raises:
-    TypeError: If `structure` is or contains a mapping with non-sortable keys.
+    TypeError:
+      If ``structure`` is or contains a mapping with non-sortable keys.
   """
   return list(_yield_flat_up_to(structure, structure))
 
 
-# Special value for use with `traverse`. See `traverse` docstring.
+#: Special value for use with :func:`traverse`.
 MAP_TO_NONE = object()
 
 
 def traverse(fn, structure, top_down=True):
   """Traverses the given nested structure, applying the given function.
 
-  The traversal is depth-first. If `top_down` is True (default), parents are
-  returned before their children (giving the option to avoid traversing into a
-  sub-tree).
+  The traversal is depth-first. If ``top_down`` is True (default), parents
+  are returned before their children (giving the option to avoid traversing
+  into a sub-tree).
 
   >>> visited = []
-  >>> traverse(visited.append, [(1, 2), [3], {"a": 4}], top_down=True)
+  >>> tree.traverse(visited.append, [(1, 2), [3], {"a": 4}], top_down=True)
   [(1, 2), [3], {'a': 4}]
   >>> visited
   [[(1, 2), [3], {'a': 4}], (1, 2), 1, 2, [3], 3, {'a': 4}, 4]
 
   >>> visited = []
-  >>> traverse(visited.append, [(1, 2), [3], {"a": 4}], top_down=False)
+  >>> tree.traverse(visited.append, [(1, 2), [3], {"a": 4}], top_down=False)
   [(1, 2), [3], {'a': 4}]
   >>> visited
   [1, 2, (1, 2), 3, [3], 4, {'a': 4}, [(1, 2), [3], {'a': 4}]]
 
   Args:
     fn: The function to be applied to each sub-nest of the structure.
+
       When traversing top-down:
-        If `fn(subtree) == None` the traversal continues into the sub-tree.
-        If `fn(subtree) != None` the traversal does not continue into the
-        sub-tree. The sub-tree will be replaced by `fn(subtree)` in the
-        returned structure (to replace the sub-tree with `None`, use the special
-        value `MAP_TO_NONE`).
+        If ``fn(subtree) is None`` the traversal continues into the sub-tree.
+        If ``fn(subtree) is not None`` the traversal does not continue into
+        the sub-tree. The sub-tree will be replaced by ``fn(subtree)`` in the
+        returned structure (to replace the sub-tree with None, use the special
+        value :data:`MAP_TO_NONE`).
+
       When traversing bottom-up:
-        If `fn(subtree) == None` the traversed sub-tree is returned unaltered.
-        If `fn(subtree) != None` the sub-tree will be replaced by `fn(subtree)`
-        in the returned structure (to replace the sub-tree with `None`, use the
-        special value `MAP_TO_NONE`).
+        If ``fn(subtree) is None`` the traversed sub-tree is returned unaltered.
+        If ``fn(subtree) is not None`` the sub-tree will be replaced by
+        ``fn(subtree)`` in the returned structure (to replace the sub-tree
+        with None, use the special value :data:`MAP_TO_NONE`).
+
     structure: The structure to traverse.
-    top_down: If `True`, parent structures will be visited before their
-      children.
+    top_down: If True, parent structures will be visited before their children.
 
   Returns:
     The structured output from the traversal.
