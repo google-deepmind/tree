@@ -1,0 +1,51 @@
+---
+name: ci
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+jobs:
+  build-and-test:
+    name: "Python ${{ matrix.python-version }} on ${{ matrix.os }}"
+    runs-on: "${{ matrix.os }}"
+
+    strategy:
+      matrix:
+        python-version: ["2.7", "3.6", "3.7", "3.8"]
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: "actions/checkout@v2"
+      - uses: "actions/setup-python@v1"
+        with:
+            python-version: "${{ matrix.python-version }}"
+      - name: "Install dependencies"
+        run: |
+          set -xe
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install pytest
+          python -m pip install -r requirements-test.txt
+        shell: bash
+      - name: "Build"
+        run: |
+          if [[ `uname` == "Darwin" ]]
+          then
+            echo "build --macos_minimum_os=10.9" >> ${HOME}/.bazelrc
+          fi
+          set -xe
+          python -VV
+          bazel --version
+          python setup.py sdist
+          pip wheel --verbose --no-deps --no-clean dist/dm-tree*.tar.gz
+          pip install dm_tree*.whl
+        shell: bash
+      - name: "Run tests"
+        run: |
+          set -xe
+          # Change directory to avoid importing tree from repo root.
+          mkdir tests && cd tests
+          python -m pytest -vv --pyargs tree
+        shell: bash
