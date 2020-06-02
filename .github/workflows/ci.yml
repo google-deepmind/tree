@@ -6,6 +6,8 @@ on:
     branches: ["master"]
   pull_request:
     branches: ["master"]
+  release:
+    types: [created]
 
 jobs:
   build-and-test:
@@ -46,6 +48,15 @@ jobs:
         run: |
           set -xe
           # Change directory to avoid importing tree from repo root.
-          mkdir tests && cd tests
+          mkdir tests && pushd tests
           python -m pytest -vv --pyargs tree
+          popd
         shell: bash
+      - uses: actions/upload-artifact@v2
+        if: ${{ github.event_name == 'release' && github.event.action == 'created' }}
+        with:
+          path: dm_tree*.whl
+      - uses: actions/upload-artifact@v2
+        if: ${{ github.event_name == 'release' && github.event.action == 'created' }}
+        with:
+          path: dist/dm-tree*.tar.gz
