@@ -44,6 +44,44 @@ except ImportError:
 else:
   typing_available = True
 
+
+# NOTE: must be defined before import of _tree so that this class is visible
+# to the implementation of _tree.
+class NestedObject(object):
+  """A nested object that can be converted to and constructed from child values.
+
+  This class is designed to allow users to implement their own types that are
+  compatible with `tree` functions.
+  """
+
+  def _sequence_like(self, children):
+    """Creates a new `self`-shaped structure from a `children` iterator."""
+    raise NotImplementedError
+
+  def __getitem__(self, key):
+    """Access an item in the nested object by key."""
+    raise NotImplementedError
+
+  def _same_child_structure(self, other):
+    """Returns whether `self` and `other` structure their children the same."""
+    if not isinstance(other, NestedObject):
+      return False
+    for (key1, _), (key2, _) in zip(self._items(), other._items()):  # pylint: disable=protected-access
+      if key1 != key2:
+        return False
+    return True
+
+  @property
+  def _items(self):
+    """Returns an iterator over (key, child) pairs."""
+    raise NotImplementedError
+
+  @property
+  def _children(self):
+    """Returns an ordered list of immediate child values."""
+    raise NotImplementedError
+
+
 try:
   from tree import _tree  # pylint: disable=g-import-not-at-top
 except ImportError:
@@ -66,6 +104,7 @@ __all__ = [
     "map_structure_with_path_up_to",
     "traverse",
     "MAP_TO_NONE",
+    "NestedObject",
 ]
 
 __version__ = "0.1.6"
@@ -204,6 +243,8 @@ def _sequence_like(instance, args):
     # For object proxies, first create the underlying type and then re-wrap it
     # in the proxy type.
     return type(instance)(_sequence_like(instance.__wrapped__, args))
+  elif isinstance(instance, NestedObject):
+    return instance._sequence_like(args)  # pylint: disable=protected-access
   else:
     # Not a namedtuple
     return type(instance)(args)
@@ -243,6 +284,9 @@ def _yield_sorted_items(iterable):
   elif _is_namedtuple(iterable):
     for field in iterable._fields:
       yield (field, getattr(iterable, field))
+  elif isinstance(iterable, NestedObject):
+    for item in iterable._items():  # pylint: disable=protected-access
+      yield item
   else:
     for item in enumerate(iterable):
       yield item
@@ -573,10 +617,9 @@ def _yield_flat_up_to(shallow_tree, input_tree, path=()):
     input_tree.
   """
   if (isinstance(shallow_tree, _TEXT_OR_BYTES) or
-      not (isinstance(shallow_tree, (collections.Mapping,
-                                     collections.Sequence)) or
-           _is_namedtuple(shallow_tree) or
-           _is_attrs(shallow_tree))):
+      not (isinstance(shallow_tree,
+                      (collections.Mapping, collections.Sequence, NestedObject))
+           or _is_namedtuple(shallow_tree) or _is_attrs(shallow_tree))):
     yield (path, input_tree)
   else:
     input_tree = dict(_yield_sorted_items(input_tree))

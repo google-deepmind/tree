@@ -36,6 +36,67 @@ STRUCTURE_DIFFERENT_NUM_ELEMENTS = ("spam", "eggs")
 STRUCTURE_DIFFERENT_NESTING = (((1, 2), 3), 4, 5, (6,))
 
 
+class CustomNested(tree.NestedObject):
+  """A structure consisting of a composed OrderedDict and list."""
+
+  def __init__(self, by_str_key, by_index):
+    self.by_str_key = by_str_key
+    self.by_index = by_index
+
+  def _new_from_children(self, children):
+    children = iter(children)
+    by_str_key = collections.OrderedDict()
+    for key in self.by_str_key:
+      by_str_key[key] = next(children)
+    by_index = list(children)
+    return CustomNested(by_str_key, by_index)
+
+  def __getitem__(self, key):
+    if isinstance(key, str):
+      return self.by_str_key[key]
+    return self.by_index[key]
+
+  def _items(self):
+    for key in self.by_str_key:
+      yield (key, self.by_str_key[key])
+    for item in enumerate(self.by_index):
+      yield item
+
+  @property
+  def _children(self):
+    return [v for (_, v) in self._items()]
+
+  def __eq__(self, other):
+    return \
+        isinstance(other, CustomNested) \
+        and self.by_str_key == other.by_str_key \
+        and self.by_index == other.by_index
+
+  def __str__(self):
+    return "CustomNested({}, {})".format(self.by_str_key, self.by_index)
+
+
+def custom_structure_with_bottom_elements(bottom_element, first_key="a"):
+  return CustomNested(
+      collections.OrderedDict({
+          first_key:
+              CustomNested(collections.OrderedDict({}), [bottom_element]),
+          "b":
+              bottom_element
+      }), [
+          CustomNested(
+              collections.OrderedDict({}), [bottom_element, bottom_element]),
+          bottom_element, bottom_element
+      ])
+
+
+CUSTOM_STRUCTURE1 = custom_structure_with_bottom_elements(1)
+CUSTOM_STRUCTURE2 = custom_structure_with_bottom_elements("whoop")
+CUSTOM1_FLATTENED = [1 for _ in range(6)]
+CUSTOM_STRUCTURE_DIFFERENT_KEY = custom_structure_with_bottom_elements(
+    1, first_key="diff_key")
+
+
 class DoctestTest(parameterized.TestCase):
 
   def testDoctest(self):
@@ -49,6 +110,14 @@ class NestTest(parameterized.TestCase):
 
   def assertAllEquals(self, a, b):
     self.assertTrue((np.asarray(a) == b).all())
+
+  def testNestedObjectFlattenAndUnflatten(self):
+    start = CUSTOM_STRUCTURE1
+    flat = tree.flatten(start)
+    self.assertEqual(flat, CUSTOM1_FLATTENED)
+    restructured = tree.unflatten_as(start, flat)
+    self.assertIsInstance(restructured, CustomNested)
+    self.assertEqual(start, restructured)
 
   def testAttrsFlattenAndUnflatten(self):
 
@@ -239,6 +308,8 @@ class NestTest(parameterized.TestCase):
     self.assertTrue(tree.is_nested(((7, 8), (5, 6))))
     self.assertTrue(tree.is_nested([]))
     self.assertTrue(tree.is_nested({"a": 1, "b": 2}))
+    self.assertTrue(
+        tree.is_nested(CustomNested(collections.OrderedDict({}), [])))
     self.assertFalse(tree.is_nested(set([1, 2])))
     ones = np.ones([2, 3])
     self.assertFalse(tree.is_nested(ones))
@@ -269,6 +340,13 @@ class NestTest(parameterized.TestCase):
     tree.assert_same_structure(u"abc", 1.0)
     tree.assert_same_structure(bytearray("abc", "ascii"), 1.0)
     tree.assert_same_structure("abc", np.array([0, 1]))
+    tree.assert_same_structure(CUSTOM_STRUCTURE1, CUSTOM_STRUCTURE2)
+
+  def testAssertSameStructureDifferentCustom(self):
+    with self.assertRaisesRegex(
+        ValueError, "The two `NestedObject`s don't have the same structure."):
+      tree.assert_same_structure(CUSTOM_STRUCTURE1,
+                                 CUSTOM_STRUCTURE_DIFFERENT_KEY)
 
   def testAssertSameStructure_differentNumElements(self):
     with self.assertRaisesRegex(

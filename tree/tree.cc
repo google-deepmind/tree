@@ -109,6 +109,14 @@ absl::string_view GetClassName(PyObject* o) {
   return name;
 }
 
+PyObjectPtr PyString(const char* str) {
+#if PY_MAJOR_VERSION < 3
+  return PyObjectPtr(PyString_FromString(str));
+#else
+  return PyObjectPtr(PyUnicode_FromString(str));
+#endif
+}
+
 std::string PyObjectToString(PyObject* o) {
   if (o == nullptr) {
     return "<null object>";
@@ -193,8 +201,8 @@ py::object GetCollectionsMappingType() {
 }
 
 py::object GetCollectionsMappingViewType() {
-    static py::object type =
-        py::module::import("collections").attr("MappingView");
+  static py::object type =
+      py::module::import("collections").attr("MappingView");
   return type;
 }
 
@@ -210,6 +218,25 @@ py::object GetWraptObjectProxyTypeUncached() {
 py::object GetWraptObjectProxyType() {
   static py::object type = GetWraptObjectProxyTypeUncached();
   return type;
+}
+
+py::object GetNestedObjectTypeUncached() {
+  return py::module::import("tree").attr("NestedObject");
+}
+
+py::object GetNestedObjectType() {
+  static py::object type = GetNestedObjectTypeUncached();
+  return type;
+}
+
+// Returns 1 if `o` is an instance of `tree.NestedObject`.
+// Returns 0 otherwise.
+// Returns -1 if an error occurred.
+int IsNestedObjectHelper(PyObject* o) {
+  static auto* const check_cache = new CachedTypeCheck([](PyObject* to_check) {
+    return PyObject_IsInstance(to_check, GetNestedObjectType().ptr());
+  });
+  return check_cache->CachedLookup(o);
 }
 
 // Returns 1 if `o` is considered a mapping for the purposes of Flatten().
@@ -276,15 +303,16 @@ int IsSequenceHelper(PyObject* o) {
   if (IsMappingHelper(o)) return true;
   if (IsMappingViewHelper(o)) return true;
   if (IsAttrsHelper(o)) return true;
+  if (IsNestedObjectHelper(o)) return true;
   if (PySet_Check(o) && !WarnedThatSetIsNotSequence) {
-    LOG_WARNING("Sets are not currently considered sequences, "
-                "but this may change in the future, "
-                "so consider avoiding using them.");
+    LOG_WARNING(
+        "Sets are not currently considered sequences, "
+        "but this may change in the future, "
+        "so consider avoiding using them.");
     WarnedThatSetIsNotSequence = true;
   }
   return check_cache->CachedLookup(o);
 }
-
 
 // ValueIterator interface
 class ValueIterator {
@@ -380,7 +408,7 @@ class MappingValueIterator : public ValueIterator {
 class SequenceValueIterator : public ValueIterator {
  public:
   explicit SequenceValueIterator(PyObject* iterable)
-      : seq_(PySequence_Fast(iterable, "")),
+      : seq_(PySequence_Fast(iterable, "Invalid sequence.")),
         size_(seq_.get() ? PySequence_Fast_GET_SIZE(seq_.get()) : 0),
         index_(0) {}
 
@@ -403,6 +431,28 @@ class SequenceValueIterator : public ValueIterator {
   PyObjectPtr seq_;
   const Py_ssize_t size_;
   Py_ssize_t index_;
+};
+
+// Iterate over a `NestedObject`'s list of `_children`
+class NestedObjectValueIterator : public SequenceValueIterator {
+ public:
+  explicit NestedObjectValueIterator(PyObjectPtr children_list)
+      : SequenceValueIterator(children_list.get()),
+        children_list_(std::move(children_list)) {
+    if (!children_list_) {
+      PyErr_SetString(PyExc_RuntimeError,
+                      "Missing `_children` property on `NestedObject`.");
+      invalidate();
+    }
+    if (!PySequence_Check(children_list_.get())) {
+      PyErr_SetString(PyExc_TypeError,
+                      "`_children` returned a value that was not a sequence.");
+      invalidate();
+    }
+  }
+
+ private:
+  PyObjectPtr children_list_;
 };
 
 class AttrsValueIterator : public ValueIterator {
@@ -444,6 +494,10 @@ ValueIteratorPtr GetValueIterator(PyObject* nested) {
     return absl::make_unique<MappingValueIterator>(nested);
   } else if (IsAttrsHelper(nested)) {
     return absl::make_unique<AttrsValueIterator>(nested);
+  } else if (IsNestedObjectHelper(nested)) {
+    PyObjectPtr children_list(PyObject_GetAttrString(nested, "_children"));
+    return absl::make_unique<NestedObjectValueIterator>(
+        std::move(children_list));
   } else {
     return absl::make_unique<SequenceValueIterator>(nested);
   }
@@ -525,9 +579,9 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
     std::string non_seq_str =
         is_seq1 ? PyObjectToString(o2) : PyObjectToString(o1);
     *is_type_error = false;
-    *error_msg = absl::StrCat(
-        "Substructure \"", seq_str, "\" is a sequence, while substructure \"",
-        non_seq_str, "\" is not");
+    *error_msg = absl::StrCat("Substructure \"", seq_str,
+                              "\" is a sequence, while substructure \"",
+                              non_seq_str, "\" is not");
     return true;
   }
 
@@ -628,6 +682,19 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
         }
         Py_DECREF(key);
       }
+    } else if (IsNestedObjectHelper(o1)) {
+      PyObjectPtr method_name(PyString("_same_child_structure"));
+      PyObjectPtr result(
+          PyObject_CallMethodObjArgs(o1, method_name.get(), o2, nullptr));
+      int is_same_structure = PyObject_IsTrue(result.get());
+      if (is_same_structure != 1) {
+        *error_msg = absl::StrCat(
+            "The two `NestedObject`s don't have the same structure. "
+            "The first structure is ",
+            PyObjectToString(o1), ", while the second structure is ",
+            PyObjectToString(o2), ".");
+        return true;
+      }
     }
   }
 
@@ -643,9 +710,8 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
       if (Py_EnterRecursiveCall(" in assert_same_structure")) {
         return false;
       }
-      bool no_internal_errors =
-          AssertSameStructureHelper(v1.get(), v2.get(), check_types, error_msg,
-                                    is_type_error);
+      bool no_internal_errors = AssertSameStructureHelper(
+          v1.get(), v2.get(), check_types, error_msg, is_type_error);
       Py_LeaveRecursiveCall();
       if (!no_internal_errors) return false;
       if (!error_msg->empty()) return true;
@@ -670,7 +736,7 @@ bool IsAttrs(PyObject* o) { return IsAttrsHelper(o) == 1; }
 
 PyObject* Flatten(PyObject* nested) {
   PyObject* list = PyList_New(0);
-  if (FlattenHelper(nested, list, IsSequenceHelper,  GetValueIterator)) {
+  if (FlattenHelper(nested, list, IsSequenceHelper, GetValueIterator)) {
     return list;
   } else {
     Py_DECREF(list);
@@ -790,39 +856,41 @@ inline py::object pyo_or_throw(PyObject* ptr) {
 }
 
 PYBIND11_MODULE(_tree, m) {
-  // Resolve `wrapt.ObjectProxy` at import time to avoid doing
+  // Resolve foreign types at import time to avoid doing
   // imports during function calls.
   tree::GetWraptObjectProxyType();
+  tree::GetNestedObjectType();
 
   m.def("assert_same_structure",
         [](py::handle& o1, py::handle& o2, bool check_types) {
           tree::AssertSameStructure(o1.ptr(), o2.ptr(), check_types);
-          if (PyErr_Occurred()) { throw py::error_already_set(); }
+          if (PyErr_Occurred()) {
+            throw py::error_already_set();
+          }
         });
-  m.def("is_sequence",
-        [](py::handle& o) {
-          bool result = tree::IsSequence(o.ptr());
-          if (PyErr_Occurred()) { throw py::error_already_set(); }
-          return result;
-        });
-  m.def("is_namedtuple",
-        [](py::handle& o, bool strict) {
-          return pyo_or_throw(tree::IsNamedtuple(o.ptr(), strict));
-        });
-  m.def("is_attrs",
-        [](py::handle& o) {
-          bool result = tree::IsAttrs(o.ptr());
-          if (PyErr_Occurred()) { throw py::error_already_set(); }
-          return result;
-        });
-  m.def("same_namedtuples",
-        [](py::handle& o1, py::handle& o2) {
-          return pyo_or_throw(tree::SameNamedtuples(o1.ptr(), o2.ptr()));
-        });
-  m.def("flatten",
-        [](py::handle& nested) {
-          return pyo_or_throw(tree::Flatten(nested.ptr()));
-        });
+  m.def("is_sequence", [](py::handle& o) {
+    bool result = tree::IsSequence(o.ptr());
+    if (PyErr_Occurred()) {
+      throw py::error_already_set();
+    }
+    return result;
+  });
+  m.def("is_namedtuple", [](py::handle& o, bool strict) {
+    return pyo_or_throw(tree::IsNamedtuple(o.ptr(), strict));
+  });
+  m.def("is_attrs", [](py::handle& o) {
+    bool result = tree::IsAttrs(o.ptr());
+    if (PyErr_Occurred()) {
+      throw py::error_already_set();
+    }
+    return result;
+  });
+  m.def("same_namedtuples", [](py::handle& o1, py::handle& o2) {
+    return pyo_or_throw(tree::SameNamedtuples(o1.ptr(), o2.ptr()));
+  });
+  m.def("flatten", [](py::handle& nested) {
+    return pyo_or_throw(tree::Flatten(nested.ptr()));
+  });
 }
 
 }  // namespace
