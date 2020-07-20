@@ -223,6 +223,16 @@ int IsMappingHelper(PyObject* o) {
   return check_cache->CachedLookup(o);
 }
 
+// Returns 1 if `o` is considered a slice object for the purposes of Flatten().
+// Returns 0 otherwise.
+// Returns -1 if an error occurred.
+int IsSliceHelper(PyObject* o) {
+  static auto* const check_cache = new CachedTypeCheck([](PyObject* to_check) {
+    return PySlice_Check(to_check);
+  });
+  return check_cache->CachedLookup(o);
+}
+
 // Returns 1 if `o` is considered a mapping view for the purposes of Flatten().
 // Returns 0 otherwise.
 // Returns -1 if an error occurred.
@@ -276,6 +286,7 @@ int IsSequenceHelper(PyObject* o) {
   if (IsMappingHelper(o)) return true;
   if (IsMappingViewHelper(o)) return true;
   if (IsAttrsHelper(o)) return true;
+  if (IsSliceHelper(o)) return true;
   if (PySet_Check(o) && !WarnedThatSetIsNotSequence) {
     LOG_WARNING("Sets are not currently considered sequences, "
                 "but this may change in the future, "
@@ -437,6 +448,31 @@ class AttrsValueIterator : public ValueIterator {
   PyObjectPtr iter_;
 };
 
+class SliceValueIterator : public ValueIterator {
+ public:
+  explicit SliceValueIterator(PyObject* slice) : slice_(slice), attr_(0) {
+    Py_INCREF(slice);
+  }
+
+  PyObjectPtr next() override {
+    PyObjectPtr result;
+    if (attr_ == 0) {
+      result.reset(PyObject_GetAttrString(slice_.get(), "start"));
+    } else if (attr_ == 1) {
+      result.reset(PyObject_GetAttrString(slice_.get(), "stop"));
+    } else if (attr_ == 2) {
+      result.reset(PyObject_GetAttrString(slice_.get(), "step"));
+    }
+    attr_++;
+
+    return result;
+  }
+
+ private:
+  PyObjectPtr slice_;
+  int attr_;
+};
+
 ValueIteratorPtr GetValueIterator(PyObject* nested) {
   if (PyDict_Check(nested)) {
     return absl::make_unique<DictValueIterator>(nested);
@@ -444,6 +480,8 @@ ValueIteratorPtr GetValueIterator(PyObject* nested) {
     return absl::make_unique<MappingValueIterator>(nested);
   } else if (IsAttrsHelper(nested)) {
     return absl::make_unique<AttrsValueIterator>(nested);
+  } else if (IsSliceHelper(nested)) {
+    return absl::make_unique<SliceValueIterator>(nested);
   } else {
     return absl::make_unique<SequenceValueIterator>(nested);
   }
@@ -667,6 +705,7 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
 
 bool IsSequence(PyObject* o) { return IsSequenceHelper(o) == 1; }
 bool IsAttrs(PyObject* o) { return IsAttrsHelper(o) == 1; }
+bool IsSlice(PyObject* o) { return IsSliceHelper(o) == 1; }
 
 PyObject* Flatten(PyObject* nested) {
   PyObject* list = PyList_New(0);
@@ -812,6 +851,12 @@ PYBIND11_MODULE(_tree, m) {
   m.def("is_attrs",
         [](py::handle& o) {
           bool result = tree::IsAttrs(o.ptr());
+          if (PyErr_Occurred()) { throw py::error_already_set(); }
+          return result;
+        });
+  m.def("is_slice",
+        [](py::handle& o) {
+          bool result = tree::IsSlice(o.ptr());
           if (PyErr_Occurred()) { throw py::error_already_set(); }
           return result;
         });

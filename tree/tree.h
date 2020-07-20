@@ -52,6 +52,15 @@ PyObject* IsNamedtuple(PyObject* o, bool strict);
 //   True if the object is an instance of an attr.s decorated class.
 bool IsAttrs(PyObject* o);
 
+// Returns a true if its input is a python `slice` object.
+//
+// Args:
+//   seq: the input to be checked.
+//
+// Returns:
+//   True if the input object is a python `slice`.
+bool IsSlice(PyObject* o);
+
 // Returns Py_True iff the two namedtuples have the same name and fields.
 // Raises RuntimeError if `o1` or `o2` don't look like namedtuples (don't have
 // '_fields' attribute).

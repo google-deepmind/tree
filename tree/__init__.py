@@ -148,6 +148,10 @@ def _is_attrs(instance):
   return _tree.is_attrs(instance)
 
 
+def _is_slice(instance):
+  return _tree.is_slice(instance)
+
+
 def _is_namedtuple(instance, strict=False):
   """Returns True iff `instance` is a `namedtuple`.
 
@@ -204,6 +208,8 @@ def _sequence_like(instance, args):
     # For object proxies, first create the underlying type and then re-wrap it
     # in the proxy type.
     return type(instance)(_sequence_like(instance.__wrapped__, args))
+  elif _is_slice(instance):
+    return slice(*args)
   else:
     # Not a namedtuple
     return type(instance)(args)
@@ -243,6 +249,10 @@ def _yield_sorted_items(iterable):
   elif _is_namedtuple(iterable):
     for field in iterable._fields:
       yield (field, getattr(iterable, field))
+  elif _is_slice(iterable):
+    yield "start", iterable.start
+    yield "stop", iterable.stop
+    yield "step", iterable.step
   else:
     for item in enumerate(iterable):
       yield item
