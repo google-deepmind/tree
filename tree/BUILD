@@ -1,6 +1,7 @@
 # Description:
 #   Tree provides utilities for working with nested data structures.
 
+load("//tools/build_defs/testing:bzl_library.bzl", "bzl_library")
 load(
     "//tree:build_defs.bzl",
     "tree_py_extension",
@@ -84,4 +85,18 @@ tree_py_test(
         ":compat",
         # util_nest_test_main_lib,
     ],
+)
+
+bzl_library(
+    name = "build_defs_bzl",
+    srcs = ["build_defs.bzl"],
+    parse_tests = False,
+    visibility = ["//visibility:private"],
+)
+
+bzl_library(
+    name = "opensource/build_defs_bzl",
+    srcs = ["opensource/build_defs.bzl"],
+    parse_tests = False,
+    visibility = ["//visibility:private"],
 )
