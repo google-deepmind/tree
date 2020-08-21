@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 #include "tree/tree.h"
 
+#include <cstring>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -53,6 +54,7 @@ struct DecrementsPyRefcount {
 using PyObjectPtr = std::unique_ptr<PyObject, DecrementsPyRefcount>;
 
 const int kMaxItemsInCache = 1024;
+const char* kIsFlattenableAttrName = "_is_flattenable";
 
 bool WarnedThatSetIsNotSequence = false;
 
@@ -193,8 +195,8 @@ py::object GetCollectionsMappingType() {
 }
 
 py::object GetCollectionsMappingViewType() {
-    static py::object type =
-        py::module::import("collections").attr("MappingView");
+  static py::object type =
+      py::module::import("collections").attr("MappingView");
   return type;
 }
 
@@ -207,9 +209,38 @@ py::object GetWraptObjectProxyTypeUncached() {
   }
 }
 
+py::object GetIsDataclassFn() {
+  try {
+    py::object fn = py::module::import("dataclasses").attr("is_dataclass");
+    fn.inc_ref();
+    return fn;
+  } catch (const py::error_already_set& e) {
+    if (e.matches(PyExc_ImportError)) return py::none();
+    throw e;
+  }
+}
+
 py::object GetWraptObjectProxyType() {
   static py::object type = GetWraptObjectProxyTypeUncached();
   return type;
+}
+
+// Check if `o` must be considered a dataclass for the purposes of Flatten().
+int IsDataclassHelper(PyObject* o) {
+  static auto* const check_cache = new CachedTypeCheck([](PyObject* to_check) {
+    int check = PyObject_IsTrue(IsDataclass(to_check, /*is_instance=*/true));
+    if (!check) {
+      return 0;
+    }
+
+    if (PyObject_HasAttrString(to_check, kIsFlattenableAttrName)) {
+      return PyObject_IsTrue(
+          PyObject_GetAttrString(to_check, kIsFlattenableAttrName));
+    } else {
+      return 1;
+    }
+  });
+  return check_cache->CachedLookup(o);
 }
 
 // Returns 1 if `o` is considered a mapping for the purposes of Flatten().
@@ -276,6 +307,7 @@ int IsSequenceHelper(PyObject* o) {
   if (IsMappingHelper(o)) return true;
   if (IsMappingViewHelper(o)) return true;
   if (IsAttrsHelper(o)) return true;
+  if (IsDataclassHelper(o)) return true;
   if (PySet_Check(o) && !WarnedThatSetIsNotSequence) {
     LOG_WARNING("Sets are not currently considered sequences, "
                 "but this may change in the future, "
@@ -444,6 +476,9 @@ ValueIteratorPtr GetValueIterator(PyObject* nested) {
     return absl::make_unique<MappingValueIterator>(nested);
   } else if (IsAttrsHelper(nested)) {
     return absl::make_unique<AttrsValueIterator>(nested);
+  } else if (IsDataclassHelper(nested)) {
+    return absl::make_unique<MappingValueIterator>(
+        PyObject_GetAttrString(nested, "__dict__"));
   } else {
     return absl::make_unique<SequenceValueIterator>(nested);
   }
@@ -670,11 +705,40 @@ bool IsAttrs(PyObject* o) { return IsAttrsHelper(o) == 1; }
 
 PyObject* Flatten(PyObject* nested) {
   PyObject* list = PyList_New(0);
-  if (FlattenHelper(nested, list, IsSequenceHelper,  GetValueIterator)) {
+  if (FlattenHelper(nested, list, IsSequenceHelper, GetValueIterator)) {
     return list;
   } else {
     Py_DECREF(list);
     return nullptr;
+  }
+}
+
+PyObject* IsDataclass(PyObject* o, bool is_instance) {
+  // Call a checker from Dataclasses python module.
+  static const py::object is_dataclass = GetIsDataclassFn();
+  if (is_dataclass.is_none()) {  // Python 2.
+      Py_RETURN_FALSE;
+  }
+  bool check = is_dataclass(py::reinterpret_borrow<py::object>(o)).cast<bool>();
+  if (!check) {
+    Py_RETURN_FALSE;
+  }
+
+  // Check if the object is an instance and not a type.
+  bool is_instance_check =
+      is_instance ? std::strcmp(o->ob_type->tp_name, "type") != 0: true;
+  if (!is_instance_check) {
+    Py_RETURN_FALSE;
+  }
+
+  // Check if the object has `__getattr__` method.
+  // In this case, the previous check will pass, however the object is not
+  // necessary a Dataclass.
+  bool has_getattr = PyObject_HasAttrString(o, "__getattr__");
+  if (has_getattr) {
+    Py_RETURN_FALSE;
+  } else {
+    Py_RETURN_TRUE;
   }
 }
 
@@ -809,6 +873,10 @@ PYBIND11_MODULE(_tree, m) {
         [](py::handle& o, bool strict) {
           return pyo_or_throw(tree::IsNamedtuple(o.ptr(), strict));
         });
+  m.def("is_dataclass",
+        [](py::handle& o, bool is_instance) {
+          return pyo_or_throw(tree::IsDataclass(o.ptr(), is_instance));
+        });
   m.def("is_attrs",
         [](py::handle& o) {
           bool result = tree::IsAttrs(o.ptr());
@@ -823,6 +891,7 @@ PYBIND11_MODULE(_tree, m) {
         [](py::handle& nested) {
           return pyo_or_throw(tree::Flatten(nested.ptr()));
         });
+  m.def("is_flattenable_attr_name", []() { return kIsFlattenableAttrName; });
 }
 
 }  // namespace

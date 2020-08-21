@@ -36,6 +36,13 @@ except ImportError:
     """Stub-class for `wrapt.ObjectProxy``."""
 
 try:
+  import dataclasses  # pylint: disable=g-import-not-at-top
+except ImportError:
+  dataclasses_available = False
+else:
+  dataclasses_available = True
+
+try:
   # pylint: disable=g-import-not-at-top
   from typing import Any, Mapping, Sequence, Union, Text, TypeVar
   # pylint: enable=g-import-not-at-top
@@ -69,6 +76,8 @@ __all__ = [
 ]
 
 __version__ = "0.1.6"
+
+_IS_FLATTENABLE_ATTR_NAME = _tree.is_flattenable_attr_name()
 
 # Note: this is *not* the same as `six.string_types`, which in Python3 is just
 #       `(str,)` (i.e. it does not include byte strings).
@@ -164,6 +173,36 @@ def _is_namedtuple(instance, strict=False):
   return _tree.is_namedtuple(instance, strict)
 
 
+def _is_dataclass(instance, is_instance=True):
+  """Returns True if `instance` is a `dataclass`.
+
+  Args:
+    instance: An instance of a Python object.
+    is_instance: Whether to check if `instance` is not `dataclass` type itself.
+
+  Returns:
+    True if `instance` is a `dataclass`.
+  """
+  return dataclasses_available and _tree.is_dataclass(instance, is_instance)
+
+
+def _is_flattable_dataclass(instance, is_instance=True):
+  """Returns True if `instance` is a `dataclass` that should be flattened.
+
+  Args:
+    instance: An instance of a Python object.
+    is_instance: Whether to check if `instance` is not `dataclass` type itself.
+
+  Returns:
+    True if `instance` is a `dataclass` that should be flattened.
+  """
+  if not _is_dataclass(instance, is_instance):
+    return False
+
+  return (not hasattr(instance, _IS_FLATTENABLE_ATTR_NAME)) or getattr(
+      instance, _IS_FLATTENABLE_ATTR_NAME)
+
+
 def _sequence_like(instance, args):
   """Converts the sequence `args` to the same type as `instance`.
 
@@ -175,20 +214,32 @@ def _sequence_like(instance, args):
   Returns:
     `args` with the type of `instance`.
   """
-  if isinstance(instance, (dict, collections.Mapping)):
-    # Pack dictionaries in a deterministic order by sorting the keys.
-    # Notice this means that we ignore the original order of `OrderedDict`
+  if isinstance(
+      instance,
+      (dict, collections.Mapping)) or _is_flattable_dataclass(instance):
+    # Pack dictionaries and dataclasses in a deterministic order by sorting the
+    # keys. Notice this means that we ignore the original order of `OrderedDict`
     # instances. This is intentional, to avoid potential bugs caused by mixing
     # ordered and plain dicts (e.g., flattening a dict but using a
     # corresponding `OrderedDict` to pack it back).
-    result = dict(zip(_sorted(instance), args))
-    keys_and_values = ((key, result[key]) for key in instance)
+
+    iterable = instance.__dict__ if _is_dataclass(instance) else instance
+    dict_sorted_keys = dict(zip(_sorted(iterable), args))
+    keys_and_values = ((key, dict_sorted_keys[key]) for key in iterable)
+
     if isinstance(instance, collections.defaultdict):
       # `defaultdict` requires a default factory as the first argument.
       return type(instance)(instance.default_factory, keys_and_values)
     elif six.PY3 and isinstance(instance, types.MappingProxyType):
       # MappingProxyType requires a dict to proxy to.
       return type(instance)(dict(keys_and_values))
+    elif _is_dataclass(instance):
+      # Pass only arguments corresponding to fields with `init=True`.
+      init_fields = {
+          f.name for f in instance.__dataclass_fields__.values() if f.init
+      }
+      valid_kwargs = {k: v for k, v in keys_and_values if k in init_fields}
+      return type(instance)(**valid_kwargs)
     else:
       return type(instance)(keys_and_values)
   elif isinstance(instance, collections.MappingView):
@@ -243,6 +294,10 @@ def _yield_sorted_items(iterable):
   elif _is_namedtuple(iterable):
     for field in iterable._fields:
       yield (field, getattr(iterable, field))
+  elif _is_flattable_dataclass(iterable):
+    # Note that fields with `init=False` are also yielded.
+    for key in _sorted(iterable.__dict__):
+      yield key, getattr(iterable, key)
   else:
     for item in enumerate(iterable):
       yield item
@@ -251,6 +306,8 @@ def _yield_sorted_items(iterable):
 def _num_elements(structure):
   if _is_attrs(structure):
     return len(getattr(structure.__class__, "__attrs_attrs__"))
+  elif _is_flattable_dataclass(structure):
+    return len(structure.__dict__)
   else:
     return len(structure)
 
@@ -576,7 +633,8 @@ def _yield_flat_up_to(shallow_tree, input_tree, path=()):
       not (isinstance(shallow_tree, (collections.Mapping,
                                      collections.Sequence)) or
            _is_namedtuple(shallow_tree) or
-           _is_attrs(shallow_tree))):
+           _is_attrs(shallow_tree) or
+           _is_flattable_dataclass(shallow_tree))):
     yield (path, input_tree)
   else:
     input_tree = dict(_yield_sorted_items(input_tree))

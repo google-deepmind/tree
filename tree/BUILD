@@ -45,6 +45,9 @@ tree_py_extension(
 tree_py_test(
     name = "tree_test",
     srcs = ["tree_test.py"],
+    py3_deps = [
+        # dataclasses
+    ],
     deps = [
         ":tree",
         # absl/testing:parameterized

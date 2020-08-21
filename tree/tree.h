@@ -43,6 +43,17 @@ bool IsSequence(PyObject* o);
 //   True if `instance` is a `namedtuple`.
 PyObject* IsNamedtuple(PyObject* o, bool strict);
 
+// Returns Py_True iff `instance` should be considered a `dataclass`.
+//
+// Args:
+//   instance: An instance of a Python object.
+//   is_instance: If True, `instance` is considered to be a `dataclass` only if
+//       it is an instance of dataclass, i.e. not the type itself.
+//
+// Returns:
+//   True if `instance` is a `dataclass`.
+PyObject* IsDataclass(PyObject* o, bool is_instance);
+
 // Returns a true if its input is an instance of an attr.s decorated class.
 //
 // Args:
