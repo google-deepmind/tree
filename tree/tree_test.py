@@ -30,6 +30,105 @@ import six
 import tree
 import wrapt
 
+
+# Test object for dataclasses tests.
+# Wrapped in `exec` to ensure compatibility with Python 2 (to workaround a
+# syntax error).
+try:
+  # pylint: disable=exec-used
+  exec("""
+import dataclasses
+import typing
+
+@six.add_metaclass(tree.DataclassesMappingInterfaceMetaclass)
+@dataclasses.dataclass
+class Dataclass:
+  k_tuple: tuple
+  k_dict: typing.Dict
+
+  def some_method(self, *args):
+    raise RuntimeError("Dataclass.some_method() was called.")
+
+@dataclasses.dataclass
+class NonFlattenableDataclass:
+  k: typing.Dict
+
+  def some_method(self, *args):
+    raise RuntimeError("NonFlattenableDataclass.some_method() was called.")
+
+@six.add_metaclass(tree.DataclassesMappingInterfaceMetaclass)
+@dataclasses.dataclass
+class NestedDataclass:
+  k_any: typing.Any
+  k_int: int
+  k_str: str
+  k_arr: np.ndarray
+  k_dataclass: Dataclass
+  k_non_flattenable_dclass: NonFlattenableDataclass
+  k_dict: typing.Dict = lambda: dict(default_key=42)
+  k_default: str = 'default_str'
+  k_non_init: int = dataclasses.field(default=1, init=False)
+
+  def some_method(self, *args):
+    raise RuntimeError("NestedDataclass.some_method() was called.")
+
+  def __post_init__(self):
+    self.k_non_init = self.k_int * 10
+
+NON_FLATTENABLE_DATACLASS_OBJ = NonFlattenableDataclass(k=dict(t='t', t2='t2'))
+DATACLASS_INNER_TEST_OBJ = Dataclass(k_tuple=(1, 2), k_dict=dict(x=10))
+DATACLASS_INNER_TEST_OBJ_WITH_INC = Dataclass(k_tuple=(2, 3), k_dict=dict(x=11))
+
+DATACLASS_TEST_OBJ = NestedDataclass(
+    k_any=None,
+    k_int=1,
+    k_str="test_str",
+    k_arr=np.array(16),
+    k_dict=dict(k1=1, k2=2),
+    k_dataclass=DATACLASS_INNER_TEST_OBJ,
+    k_non_flattenable_dclass=NON_FLATTENABLE_DATACLASS_OBJ)
+
+DATACLASS_TEST_OBJ_WITH_INC_INTS = NestedDataclass(
+    k_any=None,
+    k_int=2,
+    k_str="test_str",
+    k_arr=np.array(16),
+    k_dict=dict(k1=2, k2=3),
+    k_dataclass=DATACLASS_INNER_TEST_OBJ_WITH_INC,
+    k_non_flattenable_dclass=NON_FLATTENABLE_DATACLASS_OBJ,
+    k_default='default_str')
+
+DATACLASS_FLATTENED_WITH_PATH = [
+    (('k_any',), None),
+    (('k_arr',), np.array(16)),
+    (('k_dataclass', 'k_dict', 'x'), 10),
+    (('k_dataclass', 'k_tuple', 0), 1),
+    (('k_dataclass', 'k_tuple', 1), 2),
+    (('k_default',), 'default_str'),
+    (('k_dict', 'k1'), 1),
+    (('k_dict', 'k2'), 2),
+    (('k_int',), 1),
+    (('k_non_flattenable_dclass',), NON_FLATTENABLE_DATACLASS_OBJ),
+    (('k_non_init',), 10),
+    (('k_str',), 'test_str'),
+]
+
+DATACLASS_FLATTENED = [v for (_, v) in DATACLASS_FLATTENED_WITH_PATH]
+DATACLASS_TREE_SIZE = 17
+DATACLASS_TREE_SIZE_NO_DICTS = 14
+    """)
+  # pylint: enable=exec-used
+  dataclasses_available = True
+except (ImportError, SyntaxError):
+  DATACLASS_TEST_OBJ = []
+  DATACLASS_TEST_OBJ_WITH_INC_INTS = []
+  DATACLASS_FLATTENED_WITH_PATH = []
+  DATACLASS_FLATTENED = []
+  NON_FLATTENABLE_DATACLASS_OBJ = []
+  DATACLASS_TREE_SIZE = 0
+  DATACLASS_TREE_SIZE_NO_DICTS = 0
+  dataclasses_available = False
+
 STRUCTURE1 = (((1, 2), 3), 4, (5, 6))
 STRUCTURE2 = ((("foo1", "foo2"), "foo3"), "foo4", ("foo5", "foo6"))
 STRUCTURE_DIFFERENT_NUM_ELEMENTS = ("spam", "eggs")
@@ -43,6 +142,20 @@ class DoctestTest(parameterized.TestCase):
         tree, extraglobs={"tree": tree}, optionflags=doctest.ELLIPSIS)
     self.assertGreater(num_attempted, 0, "No doctests found.")
     self.assertEqual(num_failed, 0, "{} doctests failed".format(num_failed))
+
+
+class PythonImportsTest(parameterized.TestCase):
+
+  def testCorrectDefinition(self):
+    self.assertEqual(six.PY2, not dataclasses_available)
+
+  def testCorrectImport(self):
+    if dataclasses_available:
+      self.assertNotIsInstance(DATACLASS_TEST_OBJ, list)
+      self.assertNotEmpty(DATACLASS_FLATTENED_WITH_PATH)
+    else:
+      self.assertIsInstance(DATACLASS_TEST_OBJ, list)
+      self.assertEmpty(DATACLASS_FLATTENED_WITH_PATH)
 
 
 class NestTest(parameterized.TestCase):
@@ -80,6 +193,7 @@ class NestTest(parameterized.TestCase):
       ({"B": 10, "A": 20}, [1, 2], 3),
       ((1, 2), [3, 4], 5),
       (collections.namedtuple("Point", ["x", "y"])(1, 2), 3, 4),
+      (DATACLASS_TEST_OBJ, [2, 3], DATACLASS_TEST_OBJ),
       wrapt.ObjectProxy(
           (collections.namedtuple("Point", ["x", "y"])(1, 2), 3, 4))
   ])
@@ -118,6 +232,18 @@ class NestTest(parameterized.TestCase):
     self.assertEqual("a", tree.unflatten_as(5, ["a"]))
     self.assertEqual(
         np.array([5]), tree.unflatten_as("scalar", [np.array([5])]))
+
+    self.assertEqual(DATACLASS_FLATTENED, tree.flatten(DATACLASS_TEST_OBJ))
+    self.assertEqual(
+        DATACLASS_TEST_OBJ,
+        tree.unflatten_as(DATACLASS_TEST_OBJ_WITH_INC_INTS,
+                          DATACLASS_FLATTENED))
+
+    dataclass_in_seq = [34, DATACLASS_TEST_OBJ, [1, 2]]
+    dataclass_in_seq_flat = [34] + DATACLASS_FLATTENED + [1, 2]
+    self.assertEqual(dataclass_in_seq_flat, tree.flatten(dataclass_in_seq))
+    self.assertEqual(dataclass_in_seq,
+                     tree.unflatten_as(dataclass_in_seq, dataclass_in_seq_flat))
 
     with self.assertRaisesRegex(ValueError, "Structure is a scalar"):
       tree.unflatten_as("scalar", [4, 5])
@@ -950,6 +1076,8 @@ class NestTest(parameterized.TestCase):
            expected=[(("c", 0), 42), (("d",), 43)]),
       dict(inputs=wrapt.ObjectProxy(Bar(c=[42], d=43)),
            expected=[(("c", 0), 42), (("d",), 43)]),
+      dict(inputs=DATACLASS_TEST_OBJ,
+           expected=DATACLASS_FLATTENED_WITH_PATH),
   ])
   def testFlattenWithPath(self, inputs, expected):
     self.assertEqual(tree.flatten_with_path(inputs), expected)
@@ -1010,6 +1138,29 @@ class NestTest(parameterized.TestCase):
             structure,
             top_down=False))
 
+  def testMapDataclass(self):
+    if not dataclasses_available:
+      self.skipTest("Dataclasses not supported in Python < 3.6")
+    add_one_to_ints_fn = lambda x: x + 1 if isinstance(x, int) else x
+    self.assertEqual(DATACLASS_TEST_OBJ_WITH_INC_INTS,
+                     tree.map_structure(add_one_to_ints_fn, DATACLASS_TEST_OBJ))
+    self.assertEqual(DATACLASS_TEST_OBJ_WITH_INC_INTS.k_non_init,
+                     DATACLASS_TEST_OBJ_WITH_INC_INTS.k_int * 10)
+
+  def testTraverseDataclass(self):
+    if not dataclasses_available:
+      self.skipTest("Dataclasses not supported in Python < 3.6")
+    visited = []
+    tree.traverse(visited.append, DATACLASS_TEST_OBJ, top_down=True)
+    self.assertLen(visited, DATACLASS_TREE_SIZE)
+
+    visited_without_dicts = []
+    def visit_without_dicts(x):
+      visited_without_dicts.append(x)
+      return "X" if isinstance(x, dict) else None
+    tree.traverse(visit_without_dicts, DATACLASS_TEST_OBJ)
+    self.assertLen(visited_without_dicts, DATACLASS_TREE_SIZE_NO_DICTS)
+
   def testTraverseEarlyTermination(self):
     structure = [(1, [2]), [3, (4, 5, 6)]]
     visited = []
@@ -1023,6 +1174,7 @@ class NestTest(parameterized.TestCase):
         [[(1, [2]), [3, (4, 5, 6)]],
          (1, [2]), 1, [2], 2, [3, (4, 5, 6)], 3, (4, 5, 6)],
         visited)
+
 
 if __name__ == "__main__":
   unittest.main()

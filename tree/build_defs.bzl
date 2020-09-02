@@ -29,9 +29,9 @@ def tree_py_extension(name, srcs, hdrs, copts, features, deps):
         }),
     )
 
-def tree_py_test(name, srcs, deps):
+def tree_py_test(name, srcs, deps, py3_deps = []):
     return native.py_test(
         name = name,
         srcs = srcs,
-        deps = deps,
+        deps = deps + py3_deps,
     )

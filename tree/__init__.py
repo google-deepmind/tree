@@ -66,6 +66,7 @@ __all__ = [
     "map_structure_with_path_up_to",
     "traverse",
     "MAP_TO_NONE",
+    "DataclassesMappingInterfaceMetaclass",
 ]
 
 __version__ = "0.1.6"
@@ -951,3 +952,30 @@ def traverse(fn, structure, top_down=True):
       return None
     else:
       return ret
+
+
+class DataclassesMappingInterfaceMetaclass(type):
+  """Metaclass to cast dataclasses to collections.Mapping.
+
+  Allows tree methods to process dataclass instances in the same way as dicts.
+  """
+
+  def __new__(cls, class_name, _, dct):
+    dct["__getitem__"] = lambda self, x: self.__dict__[x]
+    dct["__len__"] = lambda self: len(self.__dict__)
+    dct["__iter__"] = lambda self: self.__dict__.__iter__()
+
+    orig_init = dct["__init__"]
+
+    def new_init(self, *orig_args, **orig_kwargs):
+      all_kwargs = dict(*orig_args, **orig_kwargs)
+
+      # Pass only arguments corresponding to fields with `init=True`.
+      init_fields = {
+          f.name for f in dct["__dataclass_fields__"].values() if f.init
+      }
+      valid_kwargs = {k: v for k, v in all_kwargs.items() if k in init_fields}
+      orig_init(self, **valid_kwargs)
+
+    dct["__init__"] = new_init
+    return type.__new__(type, class_name, (collections.Mapping,), dct)
