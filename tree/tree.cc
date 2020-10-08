@@ -182,6 +182,8 @@ class CachedTypeCheck {
   std::unordered_map<PyTypeObject*, bool> type_to_sequence_map_;
 };
 
+#if PY_MAJOR_VERSION <= 2
+
 py::object GetCollectionsSequenceType() {
   static py::object type = py::module::import("collections").attr("Sequence");
   return type;
@@ -197,6 +199,29 @@ py::object GetCollectionsMappingViewType() {
         py::module::import("collections").attr("MappingView");
   return type;
 }
+
+#else
+
+py::object GetCollectionsSequenceType() {
+  static py::object type =
+        py::module::import("collections.abc").attr("Sequence");
+  return type;
+}
+
+py::object GetCollectionsMappingType() {
+  static py::object type =
+        py::module::import("collections.abc").attr("Mapping");
+  return type;
+}
+
+py::object GetCollectionsMappingViewType() {
+    static py::object type =
+        py::module::import("collections.abc").attr("MappingView");
+  return type;
+}
+
+#endif
+
 
 py::object GetWraptObjectProxyTypeUncached() {
   try {

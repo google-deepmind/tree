@@ -20,6 +20,13 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+# pylint: disable=g-import-not-at-top
+try:
+  from collections import abc as collections_abc
+except ImportError:
+  # When collections.abc doesn't exist (Python 2), the ABCs are in the
+  # collections module, instead.
+  collections_abc = collections
 import functools
 import sys
 import types
@@ -29,28 +36,28 @@ from six.moves import map
 from six.moves import zip
 
 try:
-  import wrapt  # pylint: disable=g-import-not-at-top
+  import wrapt
   ObjectProxy = wrapt.ObjectProxy
 except ImportError:
   class ObjectProxy(object):
     """Stub-class for `wrapt.ObjectProxy``."""
 
 try:
-  # pylint: disable=g-import-not-at-top
   from typing import Any, Mapping, Sequence, Union, Text, TypeVar
-  # pylint: enable=g-import-not-at-top
 except ImportError:
   typing_available = False
 else:
   typing_available = True
 
 try:
-  from tree import _tree  # pylint: disable=g-import-not-at-top
+  from tree import _tree
 except ImportError:
   if "sphinx" not in sys.modules:
     raise
 
   _tree = None
+
+# pylint: enable=g-import-not-at-top
 
 __all__ = [
     "is_nested",
@@ -175,7 +182,7 @@ def _sequence_like(instance, args):
   Returns:
     `args` with the type of `instance`.
   """
-  if isinstance(instance, (dict, collections.Mapping)):
+  if isinstance(instance, (dict, collections_abc.Mapping)):
     # Pack dictionaries in a deterministic order by sorting the keys.
     # Notice this means that we ignore the original order of `OrderedDict`
     # instances. This is intentional, to avoid potential bugs caused by mixing
@@ -191,7 +198,7 @@ def _sequence_like(instance, args):
       return type(instance)(dict(keys_and_values))
     else:
       return type(instance)(keys_and_values)
-  elif isinstance(instance, collections.MappingView):
+  elif isinstance(instance, collections_abc.MappingView):
     # We can't directly construct mapping views, so we create a list instead
     return list(args)
   elif _is_namedtuple(instance) or _is_attrs(instance):
@@ -229,7 +236,7 @@ def _yield_sorted_items(iterable):
   Yields:
     The iterable's (key, value) pairs, in order of sorted keys.
   """
-  if isinstance(iterable, collections.Mapping):
+  if isinstance(iterable, collections_abc.Mapping):
     # Iterate through dictionaries in a deterministic order by sorting the
     # keys. Notice this means that we ignore the original order of `OrderedDict`
     # instances. This is intentional, to avoid potential bugs caused by mixing
@@ -573,8 +580,8 @@ def _yield_flat_up_to(shallow_tree, input_tree, path=()):
     input_tree.
   """
   if (isinstance(shallow_tree, _TEXT_OR_BYTES) or
-      not (isinstance(shallow_tree, (collections.Mapping,
-                                     collections.Sequence)) or
+      not (isinstance(shallow_tree, (collections_abc.Mapping,
+                                     collections_abc.Sequence)) or
            _is_namedtuple(shallow_tree) or
            _is_attrs(shallow_tree))):
     yield (path, input_tree)
@@ -657,8 +664,8 @@ def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
               input_type=type(input_tree),
               shallow_type=shallow_type))
         # pylint: enable=protected-access
-      elif not (isinstance(shallow_tree, collections.Mapping)
-                and isinstance(input_tree, collections.Mapping)):
+      elif not (isinstance(shallow_tree, collections_abc.Mapping)
+                and isinstance(input_tree, collections_abc.Mapping)):
         raise TypeError(_STRUCTURES_HAVE_MISMATCHING_TYPES.format(
             input_type=type(input_tree),
             shallow_type=shallow_type))
