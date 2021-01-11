@@ -189,7 +189,9 @@ def _sequence_like(instance, args):
     # ordered and plain dicts (e.g., flattening a dict but using a
     # corresponding `OrderedDict` to pack it back).
     result = dict(zip(_sorted(instance), args))
-    keys_and_values = ((key, result[key]) for key in instance)
+    # Using a list (and not a generator) is required to support `ConfigDict`,
+    # which do not initialize from an iterator.
+    keys_and_values = [(key, result[key]) for key in instance]
     if isinstance(instance, collections.defaultdict):
       # `defaultdict` requires a default factory as the first argument.
       return type(instance)(instance.default_factory, keys_and_values)
