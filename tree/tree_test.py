@@ -14,10 +14,6 @@
 # ==============================================================================
 """Tests for utilities working with arbitrarily nested structures."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 import doctest
 import types
@@ -26,7 +22,6 @@ import unittest
 from absl.testing import parameterized
 import attr
 import numpy as np
-import six
 import tree
 import wrapt
 
@@ -992,9 +987,6 @@ class NestTest(parameterized.TestCase):
       tree.map_structure_with_path(lambda path, *s: 0, s1, s2)
 
   def testMappingProxyType(self):
-    if six.PY2:
-      self.skipTest("Python 2 does not support mapping proxy type.")
-
     structure = types.MappingProxyType({"a": 1, "b": (2, 3)})
     expected = types.MappingProxyType({"a": 4, "b": (5, 6)})
     self.assertEqual(tree.flatten(structure), [1, 2, 3])

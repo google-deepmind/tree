@@ -20,7 +20,6 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         ":_tree",
-        # six
     ],
 )
 
@@ -50,7 +49,6 @@ tree_py_test(
         # absl/testing:parameterized
         # attr
         # numpy
-        # six
         # wrapt
     ],
 )
