@@ -8,6 +8,7 @@ Version 0.1.6
 * Dropped support for Python 2.X.
 * Added a generalization of ``tree.traverse`` which keeps track of the
   current path during traversal.
+*
 
 Version 0.1.5
 =============
