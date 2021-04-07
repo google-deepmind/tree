@@ -15,26 +15,13 @@
 
 """Functions for working with nested data structures."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
-# pylint: disable=g-import-not-at-top
-try:
-  from collections import abc as collections_abc
-except ImportError:
-  # When collections.abc doesn't exist (Python 2), the ABCs are in the
-  # collections module, instead.
-  collections_abc = collections
+from collections import abc as collections_abc
 import functools
 import sys
 import types
 
-import six
-from six.moves import map
-from six.moves import zip
-
+# pylint: disable=g-import-not-at-top
 try:
   import wrapt
   ObjectProxy = wrapt.ObjectProxy
@@ -79,7 +66,7 @@ __version__ = "0.1.6"
 
 # Note: this is *not* the same as `six.string_types`, which in Python3 is just
 #       `(str,)` (i.e. it does not include byte strings).
-_TEXT_OR_BYTES = (six.text_type, six.binary_type)
+_TEXT_OR_BYTES = (str, bytes)
 
 _SHALLOW_TREE_HAS_INVALID_KEYS = (
     "The shallow_tree's keys are not a subset of the input_tree's keys. The "
@@ -193,7 +180,7 @@ def _sequence_like(instance, args):
     if isinstance(instance, collections.defaultdict):
       # `defaultdict` requires a default factory as the first argument.
       return type(instance)(instance.default_factory, keys_and_values)
-    elif six.PY3 and isinstance(instance, types.MappingProxyType):
+    elif isinstance(instance, types.MappingProxyType):
       # MappingProxyType requires a dict to proxy to.
       return type(instance)(dict(keys_and_values))
     else:
