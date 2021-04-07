@@ -8,6 +8,7 @@ on:
     branches: ["master"]
   release:
     types: [created]
+  workflow_dispatch:
 
 jobs:
   build-and-test:
@@ -53,10 +54,10 @@ jobs:
           popd
         shell: bash
       - uses: actions/upload-artifact@v2
-        if: ${{ github.event_name == 'release' && github.event.action == 'created' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
         with:
           path: dm_tree*.whl
       - uses: actions/upload-artifact@v2
-        if: ${{ github.event_name == 'release' && github.event.action == 'created' }}
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
         with:
           path: dist/dm-tree*.tar.gz
