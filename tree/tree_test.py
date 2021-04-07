@@ -94,6 +94,26 @@ class NestTest(parameterized.TestCase):
     new_structure = tree.map_structure(lambda x: x, structure)
     self.assertEqual(structure, new_structure)
 
+  @parameterized.parameters(
+      slice(4),
+      slice(None),
+      # Because slice is overloaded, it does not take keyword args
+      slice(None, None, None),
+      slice(6, None, None),
+      slice(None, 4, None),
+      slice(None, None, 2),
+      slice(6, 2, None),
+      slice(None, 4, 5),
+      slice(3, None, 5),
+      slice(3, 7, 5),
+  )
+  def testFlattenAndUnflattenSlice(self, value):
+    structure = [value]
+    flat = tree.flatten(structure)
+    self.assertEqual(flat, [value.start, value.stop, value.step])
+    new_structure = tree.unflatten_as(structure, flat)
+    self.assertEqual(structure, new_structure)
+
   def testFlattenAndUnflatten(self):
     structure = ((3, 4), 5, (6, 7, (9, 10), 8))
     flat = ["a", "b", "c", "d", "e", "f", "g", "h"]
