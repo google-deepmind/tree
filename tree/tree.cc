@@ -22,7 +22,6 @@ limitations under the License.
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-
 #include "pybind11/pybind11.h"
 
 #ifdef LOG
@@ -57,34 +56,7 @@ const int kMaxItemsInCache = 1024;
 bool WarnedThatSetIsNotSequence = false;
 
 bool IsString(PyObject* o) {
-  return PyBytes_Check(o) ||
-         PyByteArray_Check(o) ||
-#if PY_MAJOR_VERSION < 3
-         PyString_Check(o) ||
-#endif
-         PyUnicode_Check(o);
-}
-
-// Work around a writable-strings warning with Python 2's PyMapping_Keys macro,
-// and while we're at it give them consistent behavior by making sure the
-// returned value is a list.
-//
-// As with PyMapping_Keys, returns a new reference.
-//
-// On failure, returns nullptr.
-PyObject* MappingKeys(PyObject* o) {
-#if PY_MAJOR_VERSION >= 3
-  return PyMapping_Keys(o);
-#else
-  static char key_method_name[] = "keys";
-  PyObjectPtr raw_result(PyObject_CallMethod(o, key_method_name, nullptr));
-  if (PyErr_Occurred() || raw_result.get() == nullptr) {
-    return nullptr;
-  }
-  return PySequence_Fast(
-      raw_result.get(),
-      "The '.keys()' method of a custom mapping returned a non-sequence.");
-#endif
+  return PyBytes_Check(o) || PyByteArray_Check(o) || PyUnicode_Check(o);
 }
 
 // Equivalent to Python's 'o.__class__.__name__'
@@ -115,11 +87,7 @@ std::string PyObjectToString(PyObject* o) {
   }
   PyObject* str = PyObject_Str(o);
   if (str) {
-#if PY_MAJOR_VERSION < 3
-    std::string s(PyString_AS_STRING(str));
-#else
     std::string s(PyUnicode_AsUTF8(str));
-#endif
     Py_DECREF(str);
     return absl::StrCat("type=", GetClassName(o), " str=", s);
   } else {
@@ -182,46 +150,23 @@ class CachedTypeCheck {
   std::unordered_map<PyTypeObject*, bool> type_to_sequence_map_;
 };
 
-#if PY_MAJOR_VERSION <= 2
-
-py::object GetCollectionsSequenceType() {
-  static py::object type = py::module::import("collections").attr("Sequence");
-  return type;
-}
-
-py::object GetCollectionsMappingType() {
-  static py::object type = py::module::import("collections").attr("Mapping");
-  return type;
-}
-
-py::object GetCollectionsMappingViewType() {
-    static py::object type =
-        py::module::import("collections").attr("MappingView");
-  return type;
-}
-
-#else
-
 py::object GetCollectionsSequenceType() {
   static py::object type =
-        py::module::import("collections.abc").attr("Sequence");
+      py::module::import("collections.abc").attr("Sequence");
   return type;
 }
 
 py::object GetCollectionsMappingType() {
   static py::object type =
-        py::module::import("collections.abc").attr("Mapping");
+      py::module::import("collections.abc").attr("Mapping");
   return type;
 }
 
 py::object GetCollectionsMappingViewType() {
-    static py::object type =
-        py::module::import("collections.abc").attr("MappingView");
+  static py::object type =
+      py::module::import("collections.abc").attr("MappingView");
   return type;
 }
-
-#endif
-
 
 py::object GetWraptObjectProxyTypeUncached() {
   try {
@@ -302,14 +247,14 @@ int IsSequenceHelper(PyObject* o) {
   if (IsMappingViewHelper(o)) return true;
   if (IsAttrsHelper(o)) return true;
   if (PySet_Check(o) && !WarnedThatSetIsNotSequence) {
-    LOG_WARNING("Sets are not currently considered sequences, "
-                "but this may change in the future, "
-                "so consider avoiding using them.");
+    LOG_WARNING(
+        "Sets are not currently considered sequences, "
+        "but this may change in the future, "
+        "so consider avoiding using them.");
     WarnedThatSetIsNotSequence = true;
   }
   return check_cache->CachedLookup(o);
 }
-
 
 // ValueIterator interface
 class ValueIterator {
@@ -371,7 +316,7 @@ class DictValueIterator : public ValueIterator {
 class MappingValueIterator : public ValueIterator {
  public:
   explicit MappingValueIterator(PyObject* mapping)
-      : mapping_(mapping), keys_(MappingKeys(mapping)) {
+      : mapping_(mapping), keys_(PyMapping_Keys(mapping)) {
     if (!keys_ || PyList_Sort(keys_.get()) == -1) {
       invalidate();
     } else {
@@ -506,14 +451,14 @@ bool FlattenHelper(
 // 'dict1' and 'dict2' are assumed to be Python dictionaries.
 void SetDifferentKeysError(PyObject* dict1, PyObject* dict2,
                            std::string* error_msg, bool* is_type_error) {
-  PyObjectPtr k1(MappingKeys(dict1));
+  PyObjectPtr k1(PyMapping_Keys(dict1));
   if (PyErr_Occurred() || k1.get() == nullptr) {
     *error_msg =
         ("The two dictionaries don't have the same set of keys. Failed to "
          "fetch keys.");
     return;
   }
-  PyObjectPtr k2(MappingKeys(dict2));
+  PyObjectPtr k2(PyMapping_Keys(dict2));
   if (PyErr_Occurred() || k2.get() == nullptr) {
     *error_msg =
         ("The two dictionaries don't have the same set of keys. Failed to "
@@ -550,9 +495,9 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
     std::string non_seq_str =
         is_seq1 ? PyObjectToString(o2) : PyObjectToString(o1);
     *is_type_error = false;
-    *error_msg = absl::StrCat(
-        "Substructure \"", seq_str, "\" is a sequence, while substructure \"",
-        non_seq_str, "\" is not");
+    *error_msg = absl::StrCat("Substructure \"", seq_str,
+                              "\" is a sequence, while substructure \"",
+                              non_seq_str, "\" is not");
     return true;
   }
 
@@ -668,9 +613,8 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
       if (Py_EnterRecursiveCall(" in assert_same_structure")) {
         return false;
       }
-      bool no_internal_errors =
-          AssertSameStructureHelper(v1.get(), v2.get(), check_types, error_msg,
-                                    is_type_error);
+      bool no_internal_errors = AssertSameStructureHelper(
+          v1.get(), v2.get(), check_types, error_msg, is_type_error);
       Py_LeaveRecursiveCall();
       if (!no_internal_errors) return false;
       if (!error_msg->empty()) return true;
@@ -695,7 +639,7 @@ bool IsAttrs(PyObject* o) { return IsAttrsHelper(o) == 1; }
 
 PyObject* Flatten(PyObject* nested) {
   PyObject* list = PyList_New(0);
-  if (FlattenHelper(nested, list, IsSequenceHelper,  GetValueIterator)) {
+  if (FlattenHelper(nested, list, IsSequenceHelper, GetValueIterator)) {
     return list;
   } else {
     Py_DECREF(list);
@@ -822,32 +766,33 @@ PYBIND11_MODULE(_tree, m) {
   m.def("assert_same_structure",
         [](py::handle& o1, py::handle& o2, bool check_types) {
           tree::AssertSameStructure(o1.ptr(), o2.ptr(), check_types);
-          if (PyErr_Occurred()) { throw py::error_already_set(); }
+          if (PyErr_Occurred()) {
+            throw py::error_already_set();
+          }
         });
-  m.def("is_sequence",
-        [](py::handle& o) {
-          bool result = tree::IsSequence(o.ptr());
-          if (PyErr_Occurred()) { throw py::error_already_set(); }
-          return result;
-        });
-  m.def("is_namedtuple",
-        [](py::handle& o, bool strict) {
-          return pyo_or_throw(tree::IsNamedtuple(o.ptr(), strict));
-        });
-  m.def("is_attrs",
-        [](py::handle& o) {
-          bool result = tree::IsAttrs(o.ptr());
-          if (PyErr_Occurred()) { throw py::error_already_set(); }
-          return result;
-        });
-  m.def("same_namedtuples",
-        [](py::handle& o1, py::handle& o2) {
-          return pyo_or_throw(tree::SameNamedtuples(o1.ptr(), o2.ptr()));
-        });
-  m.def("flatten",
-        [](py::handle& nested) {
-          return pyo_or_throw(tree::Flatten(nested.ptr()));
-        });
+  m.def("is_sequence", [](py::handle& o) {
+    bool result = tree::IsSequence(o.ptr());
+    if (PyErr_Occurred()) {
+      throw py::error_already_set();
+    }
+    return result;
+  });
+  m.def("is_namedtuple", [](py::handle& o, bool strict) {
+    return pyo_or_throw(tree::IsNamedtuple(o.ptr(), strict));
+  });
+  m.def("is_attrs", [](py::handle& o) {
+    bool result = tree::IsAttrs(o.ptr());
+    if (PyErr_Occurred()) {
+      throw py::error_already_set();
+    }
+    return result;
+  });
+  m.def("same_namedtuples", [](py::handle& o1, py::handle& o2) {
+    return pyo_or_throw(tree::SameNamedtuples(o1.ptr(), o2.ptr()));
+  });
+  m.def("flatten", [](py::handle& nested) {
+    return pyo_or_throw(tree::Flatten(nested.ptr()));
+  });
 }
 
 }  // namespace
