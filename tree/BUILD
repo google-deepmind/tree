@@ -3,6 +3,7 @@
 
 load(
     "//tree:build_defs.bzl",
+    "COMPAT_VISIBILITY",
     "tree_py_extension",
     "tree_py_test",
 )
@@ -60,10 +61,6 @@ tree_py_test(
         ":tree",
     ],
 )
-
-# TODO(b/143278181): Restrict visibility to projects which depend on the
-# deprecated functions and therefore could not migrate to ``:tree``.
-COMPAT_VISIBILITY = ["//visibility:public"]
 
 py_library(
     name = "compat",
