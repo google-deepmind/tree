@@ -3,7 +3,7 @@
 
 load(
     "//tree:build_defs.bzl",
-    "COMPAT_VISIBILITY",
+    "COMPAT_USERS",
     "tree_py_extension",
     "tree_py_test",
 )
@@ -62,11 +62,18 @@ tree_py_test(
     ],
 )
 
+package_group(
+    name = "compat_users",
+    packages = COMPAT_USERS,
+)
+
 py_library(
     name = "compat",
     srcs = [],  # compat.py
     srcs_version = "PY2AND3",
-    visibility = COMPAT_VISIBILITY,
+    visibility = [
+        ":compat_users",
+    ],
     deps = [
         ":tree",
     ],

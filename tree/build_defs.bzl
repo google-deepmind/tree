@@ -8,7 +8,7 @@ _SHARED_LIB_SUFFIX = {
     "//bazel:windows": ".dll",
 }
 
-COMPAT_VISIBILITY = []
+COMPAT_USERS = []
 
 def tree_py_extension(name, srcs, hdrs, copts, features, deps):
     for shared_lib_suffix in collections.uniq(_SHARED_LIB_SUFFIX.values()):
