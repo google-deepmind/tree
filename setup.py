@@ -126,7 +126,6 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     # Contained modules and scripts.
     packages=setuptools.find_packages(),
-    install_requires=_parse_requirements('requirements.txt'),
     tests_require=_parse_requirements('requirements-test.txt'),
     test_suite='tree',
     cmdclass=dict(build_ext=BuildBazelExtension),
