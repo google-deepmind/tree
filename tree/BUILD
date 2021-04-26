@@ -78,12 +78,3 @@ py_library(
         ":tree",
     ],
 )
-
-tree_py_test(
-    name = "compat_test",
-    srcs = [],  # compat_test.py
-    deps = [
-        ":compat",
-        # util_nest_test_main_lib,
-    ],
-)
