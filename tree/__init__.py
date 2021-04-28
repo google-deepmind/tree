@@ -583,6 +583,41 @@ def _yield_flat_up_to(shallow_tree, input_tree, path=()):
         yield (leaf_path, leaf_value)
 
 
+def _multiyield_flat_up_to(shallow_tree, *input_trees):
+  """Same as `_yield_flat_up_to`, but takes multiple input trees."""
+  zipped_iterators = zip(*[_yield_flat_up_to(shallow_tree, input_tree)
+                           for input_tree in input_trees])
+  for paths_and_values in zipped_iterators:
+    paths, values = zip(*paths_and_values)
+    yield paths[0], values
+
+
+def _pad_to_length(l, length):
+  while len(l) < length:
+    l.append(l.__class__())
+
+
+def _update_from_path(struct, path, value):
+  """Updates a nested structure in-place with a provided value."""
+  if not path:
+    return
+  if not isinstance(struct, (collections.Mapping, list)):
+    raise ValueError(f"Encountered un-updatable structure: {struct}")
+  # Base case:
+  if len(path) == 1:
+    if isinstance(struct, list):
+      _pad_to_length(struct, path[0]+1)
+    struct[path[0]] = value
+    return
+  # Recurse:
+  if isinstance(struct, collections.Mapping):
+    if path[0] not in struct:
+      struct[path[0]] = struct.__class__()
+  elif isinstance(struct, list):
+    _pad_to_length(struct, path[0] + 1)
+  return _update_from_path(struct[path[0]], path[1:], value)
+
+
 def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
   """Asserts that `shallow_tree` is a shallow structure of `input_tree`.
 
@@ -818,6 +853,7 @@ def map_structure_with_path_up_to(shallow_structure, func, *structures,
       that namedtuples with identical name and fields are considered to be the
       same type.
 
+
   Raises:
     TypeError: If `func` is not callable or if `structures` have different
       layout or if the layout of `shallow_structure` does not match that of
@@ -833,23 +869,14 @@ def map_structure_with_path_up_to(shallow_structure, func, *structures,
   """
   if not structures:
     raise ValueError("Cannot map over no sequences")
-
   check_types = kwargs.pop("check_types", True)
 
-  for input_tree in structures:
-    _assert_shallow_structure(
-        shallow_structure, input_tree, check_types=check_types)
-
-  # Flatten each input separately, apply the function to corresponding elements,
-  # then repack based on the structure of the first input.
-  flat_value_lists = (
-      flatten_up_to(shallow_structure, input_tree, check_types)
-      for input_tree in structures)
-  flat_path_list = [path for path, _
-                    in _yield_flat_up_to(shallow_structure, structures[0])]
-  return unflatten_as(
-      shallow_structure,
-      [func(*args) for args in zip(flat_path_list, *flat_value_lists)])
+  res = shallow_structure.__class__()
+  for path, values in _multiyield_flat_up_to(shallow_structure, *structures):
+    for other in values[1:]:
+      assert_same_structure(values[0], other, check_types=check_types)
+    _update_from_path(res, path, func(path, *values))
+  return res
 
 
 def flatten_with_path(structure):

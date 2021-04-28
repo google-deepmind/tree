@@ -975,12 +975,12 @@ class NestTest(parameterized.TestCase):
       dict(testcase_name="Tuples", s1=(1, 2, 3), s2=(4, 5),
            error_type=ValueError),
       dict(testcase_name="Dicts", s1={"a": 1}, s2={"b": 2},
-           error_type=ValueError),
-      dict(testcase_name="Mixed", s1=(1, 2), s2=[3, 4], error_type=TypeError),
+           error_type=KeyError),
+      dict(testcase_name="Mixed", s1=(1, 2), s2=[3, 4], error_type=ValueError),
       dict(testcase_name="Nested",
            s1={"a": [2, 3, 4], "b": [1, 3]},
            s2={"b": [5, 6], "a": [8, 9]},
-           error_type=ValueError)
+           error_type=KeyError)
   ])
   def testMapWithPathIncompatibleStructures(self, s1, s2, error_type):
     with self.assertRaises(error_type):
@@ -1015,6 +1015,19 @@ class NestTest(parameterized.TestCase):
         [[(1, [2]), [3, (4, 5, 6)]],
          (1, [2]), 1, [2], 2, [3, (4, 5, 6)], 3, (4, 5, 6)],
         visited)
+
+  def testMapStructureAcrossSubtrees(self):
+    shallow = {"a": 1, "b": {"c": 2}}
+    deep1 = {"a": 2, "b": {"c": 3, "d": 2}, "e": 4}
+    deep2 = {"a": 3, "b": {"c": 2, "d": 3}, "e": 1}
+    summed = tree.map_structure_up_to(shallow, sum, deep1, deep2)
+    expected = {"a": 5, "b": {"c": 5}}
+    self.assertEqual(summed, expected)
+    concatenated = tree.map_structure_up_to(
+        shallow, lambda *args: args, deep1, deep2)
+    expected = {"a": (2, 3), "b": {"c": (3, 2)}}
+    self.assertEqual(concatenated, expected)
+
 
 if __name__ == "__main__":
   unittest.main()
