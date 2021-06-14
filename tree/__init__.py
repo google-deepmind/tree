@@ -18,6 +18,7 @@
 import collections
 from collections import abc as collections_abc
 import functools
+import logging
 import sys
 import types
 
@@ -583,6 +584,22 @@ def _yield_flat_up_to(shallow_tree, input_tree, path=()):
         yield (leaf_path, leaf_value)
 
 
+def _multiyield_flat_up_to(shallow_tree, *input_trees):
+  """Same as `_yield_flat_up_to`, but takes multiple input trees."""
+  zipped_iterators = zip(*[_yield_flat_up_to(shallow_tree, input_tree)
+                           for input_tree in input_trees])
+  try:
+    for paths_and_values in zipped_iterators:
+      paths, values = zip(*paths_and_values)
+      yield paths[:1] + values
+  except KeyError as e:
+    paths = locals().get("paths", ((),))
+    raise ValueError(f"Could not find key '{e.args[0]}' in some `input_trees`. "
+                     "Please ensure the structure of all `input_trees` are "
+                     "compatible with `shallow_tree`. The last valid path "
+                     f"yielded was {paths[0]}.") from e
+
+
 def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
   """Asserts that `shallow_tree` is a shallow structure of `input_tree`.
 
@@ -775,19 +792,11 @@ def map_structure_up_to(shallow_structure, func, *structures, **kwargs):
     shallow_structure: A structure with layout common to all `structures`.
     func: A callable that accepts as many arguments as there are structures.
     *structures: Arbitrarily nested structures of the same layout.
-    **kwargs: The only valid keyword argument is `check_types`. If `True`
-      (default) the types of components within the structures have
-      to be match, e.g.
-      ``tree.map_structure_up_to([None], func, [1], (1,))`` will raise
-      a `TypeError`, otherwise this is not enforced. Note that namedtuples
-      with identical name and fields are considered to be the same type.
+    **kwargs: No valid keyword arguments.
   Raises:
-    TypeError: If the layout of `shallow_structure` does not match that of
-      `input_structure`.
-    TypeError: If `check_types` is `True` and `shallow_structure` and
-      `input_structure` differ in the types of their components.
-    ValueError: If no structures were given or if a keyword argument other
-      than `check_types` is provided.
+    ValueError: If `func` is not callable or if `structures` have different
+      layout or if the layout of `shallow_structure` does not match that of
+      `structures` or if no structures were given.
 
   Returns:
     A new structure with the same layout as `shallow_structure`.
@@ -811,45 +820,25 @@ def map_structure_with_path_up_to(shallow_structure, func, *structures,
     func: A callable that accepts a path and as many arguments as there are
       structures.
     *structures: Arbitrarily nested structures of the same layout.
-    **kwargs: The only valid keyword argument is `check_types`. If `True`
-      (default) the types of components within the structures have to be match,
-      e.g. ``tree.map_structure_with_path_up_to([None], func, [1],
-      (1,))`` will raise a `TypeError`, otherwise this is not enforced. Note
-      that namedtuples with identical name and fields are considered to be the
-      same type.
+    **kwargs: No valid keyword arguments.
 
   Raises:
-    TypeError: If `func` is not callable or if `structures` have different
+    ValueError: If `func` is not callable or if `structures` have different
       layout or if the layout of `shallow_structure` does not match that of
-      `structures`.
-    TypeError: If `check_types` is `True` and `shallow_structure` and
-      `input_structure` differ in the types of their components.
-    ValueError: If no structures were given or if a keyword argument other
-      than `check_types` is provided.
+      `structures` or if no structures were given.
 
   Returns:
     Result of repeatedly applying `func`. Has the same structure layout
     as `shallow_tree`.
   """
-  if not structures:
-    raise ValueError("Cannot map over no sequences")
-
-  check_types = kwargs.pop("check_types", True)
-
-  for input_tree in structures:
-    _assert_shallow_structure(
-        shallow_structure, input_tree, check_types=check_types)
-
-  # Flatten each input separately, apply the function to corresponding elements,
-  # then repack based on the structure of the first input.
-  flat_value_lists = (
-      flatten_up_to(shallow_structure, input_tree, check_types)
-      for input_tree in structures)
-  flat_path_list = [path for path, _
-                    in _yield_flat_up_to(shallow_structure, structures[0])]
-  return unflatten_as(
-      shallow_structure,
-      [func(*args) for args in zip(flat_path_list, *flat_value_lists)])
+  if "check_types" in kwargs:
+    logging.warning("The use of `check_types` is deprecated and does not have "
+                    "any effect.")
+  del kwargs
+  results = []
+  for path_and_values in _multiyield_flat_up_to(shallow_structure, *structures):
+    results.append(func(*path_and_values))
+  return unflatten_as(shallow_structure, results)
 
 
 def flatten_with_path(structure):
