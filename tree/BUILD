@@ -35,8 +35,6 @@ tree_py_extension(
     features = ["-use_header_modules"],
     deps = [
         # base,
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
         "@pybind11_archive//:pybind11",
         "@python_headers",
     ],
