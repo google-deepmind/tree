@@ -50,6 +50,7 @@ except ImportError:
 __all__ = [
     "is_nested",
     "assert_same_structure",
+    "assert_shallow_structure",
     "unflatten_as",
     "flatten",
     "flatten_up_to",
@@ -600,7 +601,7 @@ def _multiyield_flat_up_to(shallow_tree, *input_trees):
                      f"yielded was {paths[0]}.") from e
 
 
-def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
+def assert_shallow_structure(shallow_tree, input_tree, check_types=True):
   """Asserts that `shallow_tree` is a shallow structure of `input_tree`.
 
   That is, this function recursively tests if each key in shallow_tree has its
@@ -612,7 +613,7 @@ def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
 
   >>> shallow_tree = {"a": "A", "b": "B"}
   >>> input_tree = {"a": 1, "c": 2}
-  >>> _assert_shallow_structure(shallow_tree, input_tree)
+  >>> assert_shallow_structure(shallow_tree, input_tree)
   Traceback (most recent call last):
     ...
   ValueError: The shallow_tree's keys are not a subset of the input_tree's ...
@@ -621,7 +622,7 @@ def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
 
   >>> shallow_tree = ["a", "b"]
   >>> input_tree = ["c", ["d", "e"], "f"]
-  >>> _assert_shallow_structure(shallow_tree, input_tree)
+  >>> assert_shallow_structure(shallow_tree, input_tree)
   Traceback (most recent call last):
     ...
   ValueError: The two structures don't have the same sequence length. ...
@@ -631,7 +632,7 @@ def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
   are treated equivalently to Mappables that map integer keys (indices) to
   values. The following code will therefore not raise an exception:
 
-  >>> _assert_shallow_structure({0: "foo"}, ["foo"], check_types=False)
+  >>> assert_shallow_structure({0: "foo"}, ["foo"], check_types=False)
 
   Args:
     shallow_tree: an arbitrarily nested structure.
@@ -697,8 +698,11 @@ def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
 
     for shallow_key, shallow_branch in shallow_iter:
       input_branch = get_matching_input_branch(shallow_key)
-      _assert_shallow_structure(
+      assert_shallow_structure(
           shallow_branch, input_branch, check_types=check_types)
+
+
+_assert_shallow_structure = assert_shallow_structure
 
 
 def flatten_up_to(shallow_structure, input_structure, check_types=True):
@@ -737,7 +741,7 @@ def flatten_up_to(shallow_structure, input_structure, check_types=True):
     TypeError: If `check_types` is `True` and `shallow_structure` and
       `input_structure` differ in the types of their components.
   """
-  _assert_shallow_structure(
+  assert_shallow_structure(
       shallow_structure, input_structure, check_types=check_types)
   # Discard paths returned by _yield_flat_up_to.
   return [v for _, v in _yield_flat_up_to(shallow_structure, input_structure)]
@@ -770,7 +774,7 @@ def flatten_with_path_up_to(shallow_structure,
     TypeError: If `check_types` is `True` and `shallow_structure` and
       `input_structure` differ in the types of their components.
   """
-  _assert_shallow_structure(
+  assert_shallow_structure(
       shallow_structure, input_structure, check_types=check_types)
   return list(_yield_flat_up_to(shallow_structure, input_structure))
 
