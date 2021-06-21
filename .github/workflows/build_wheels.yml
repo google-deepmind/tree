@@ -1,0 +1,47 @@
+name: build_wheels
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  release:
+    types: [created]
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04] #, windows-2019, macos-10.15]
+    env:
+      # While testing, try specific versions
+      CIBW_BUILD: cp36-* cp36-* cp37-* cp38-* cp39-*
+      CIBW_PROJECT_REQUIRES_PYTHON: ">=3.6"
+      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+      CIBW_MANYLINUX_I686_IMAGE: manylinux2014
+      CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux2014
+      CIBW_ENVIRONMENT: ${{ matrix.CIBW_ENVIRONMENT }}
+      CIBW_BEFORE_ALL: bash setup_bazel.sh
+      CIBW_BEFORE_BUILD: alias bazel="/project/tmp/manylinux-bazel/src/output/bazel"
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+
+      - name: Install
+        run: |
+          pwd
+          python --version
+          python -m pip install --upgrade pip setuptools wheel
+          bazel --version
+        #  python -m pip install cibuildwheel
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v1.11.1.post1
+
+      #- name: Build wheels
+      #  run: |
+      #  #  python -m cibuildwheel --output-dir wheelhouse
+      #    ls -la wheelhouse

@@ -2,10 +2,10 @@
 name: ci
 
 on:
-  push:
-    branches: ["master"]
-  pull_request:
-    branches: ["master"]
+  #push:
+  #  branches: ["master"]
+  #pull_request:
+  #  branches: ["master"]
   release:
     types: [created]
   workflow_dispatch:

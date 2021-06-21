@@ -17,13 +17,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from distutils import sysconfig
 import os
 import posixpath
 import re
 import shutil
 import sys
 
-from distutils import sysconfig
 import setuptools
 from setuptools.command import build_ext
 
@@ -90,7 +90,8 @@ class BuildBazelExtension(build_ext.build_ext):
       os.makedirs(self.build_temp)
 
     bazel_argv = [
-        'bazel',
+        # 'bazel',
+        '/project/tmp/manylinux-bazel/src/output/bazel',
         'build',
         ext.bazel_target,
         '--symlink_prefix=' + os.path.join(self.build_temp, 'bazel-'),
