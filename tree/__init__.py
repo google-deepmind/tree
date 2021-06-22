@@ -21,6 +21,10 @@ import functools
 import logging
 import sys
 import types
+from tree.sequence import _is_attrs
+from tree.sequence import _is_namedtuple
+from tree.sequence import _sequence_like
+from tree.sequence import _sorted
 
 # pylint: disable=g-import-not-at-top
 try:
@@ -129,79 +133,6 @@ def _get_attrs_items(obj):
   """
   return [(attr.name, getattr(obj, attr.name))
           for attr in obj.__class__.__attrs_attrs__]
-
-
-def _sorted(dictionary):
-  """Returns a sorted list of the dict keys, with error if keys not sortable."""
-  try:
-    return sorted(dictionary)
-  except TypeError:
-    raise TypeError("tree only supports dicts with sortable keys.")
-
-
-def _is_attrs(instance):
-  return _tree.is_attrs(instance)
-
-
-def _is_namedtuple(instance, strict=False):
-  """Returns True iff `instance` is a `namedtuple`.
-
-  Args:
-    instance: An instance of a Python object.
-    strict: If True, `instance` is considered to be a `namedtuple` only if
-        it is a "plain" namedtuple. For instance, a class inheriting
-        from a `namedtuple` will be considered to be a `namedtuple`
-        iff `strict=False`.
-
-  Returns:
-    True if `instance` is a `namedtuple`.
-  """
-  return _tree.is_namedtuple(instance, strict)
-
-
-def _sequence_like(instance, args):
-  """Converts the sequence `args` to the same type as `instance`.
-
-  Args:
-    instance: an instance of `tuple`, `list`, `namedtuple`, `dict`, or
-        `collections.OrderedDict`.
-    args: elements to be converted to the `instance` type.
-
-  Returns:
-    `args` with the type of `instance`.
-  """
-  if isinstance(instance, (dict, collections_abc.Mapping)):
-    # Pack dictionaries in a deterministic order by sorting the keys.
-    # Notice this means that we ignore the original order of `OrderedDict`
-    # instances. This is intentional, to avoid potential bugs caused by mixing
-    # ordered and plain dicts (e.g., flattening a dict but using a
-    # corresponding `OrderedDict` to pack it back).
-    result = dict(zip(_sorted(instance), args))
-    keys_and_values = ((key, result[key]) for key in instance)
-    if isinstance(instance, collections.defaultdict):
-      # `defaultdict` requires a default factory as the first argument.
-      return type(instance)(instance.default_factory, keys_and_values)
-    elif isinstance(instance, types.MappingProxyType):
-      # MappingProxyType requires a dict to proxy to.
-      return type(instance)(dict(keys_and_values))
-    else:
-      return type(instance)(keys_and_values)
-  elif isinstance(instance, collections_abc.MappingView):
-    # We can't directly construct mapping views, so we create a list instead
-    return list(args)
-  elif _is_namedtuple(instance) or _is_attrs(instance):
-    if isinstance(instance, ObjectProxy):
-      instance_type = type(instance.__wrapped__)
-    else:
-      instance_type = type(instance)
-    return instance_type(*args)
-  elif isinstance(instance, ObjectProxy):
-    # For object proxies, first create the underlying type and then re-wrap it
-    # in the proxy type.
-    return type(instance)(_sequence_like(instance.__wrapped__, args))
-  else:
-    # Not a namedtuple
-    return type(instance)(args)
 
 
 def _yield_value(iterable):
@@ -506,7 +437,6 @@ def map_structure(func, *structures, **kwargs):  # pylint: disable=redefined-bui
 
   for other in structures[1:]:
     assert_same_structure(structures[0], other, check_types=check_types)
-
   return unflatten_as(structures[0],
                       [func(*args) for args in zip(*map(flatten, structures))])
 
@@ -1008,3 +938,5 @@ def traverse_with_path(fn, structure, top_down=True):
         return ret
 
   return traverse_impl((), structure)
+
+

@@ -16,6 +16,7 @@ limitations under the License.
 #ifndef TREE_H_
 #define TREE_H_
 
+#include <memory>
 #include <Python.h>
 
 namespace tree {
@@ -112,6 +113,26 @@ void AssertSameStructure(PyObject* o1, PyObject* o2, bool check_types);
 //   TypeError: The nest is or contains a dict with non-sortable keys.
 PyObject* Flatten(PyObject* nested);
 
+struct DecrementsPyRefcount {
+  void operator()(PyObject* p) const { Py_DECREF(p); }
+};
+
+// ValueIterator interface
+class ValueIterator {
+ public:
+  virtual ~ValueIterator() {}
+  virtual std::unique_ptr<PyObject, DecrementsPyRefcount> next() = 0;
+
+  bool valid() const { return is_valid_; }
+
+ protected:
+  void invalidate() { is_valid_ = false; }
+
+ private:
+  bool is_valid_ = true;
+};
+
+std::unique_ptr<ValueIterator> GetValueIterator(PyObject* nested);
 }  // namespace tree
 
 #endif  // TREE_H_

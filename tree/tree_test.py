@@ -1066,5 +1066,17 @@ class NestTest(parameterized.TestCase):
     expected = Bar(3)
     self.assertEqual(summed, expected)
 
+  def testNoneNodeIncluded(self):
+    structure = ((1, None))
+    self.assertEqual(tree.flatten(structure), [1, None])
+
+  def testSortsDictKeys(self):
+    structure = {"a": {"c": "cc", "b": "bb"}}
+    actual = tree.map_structure(lambda v: v*2, structure)
+    expected = {"a": {"b": "bbbb", "c": "cccc"}}
+    # Slightly roundabout accessing allows asserting on dict ordering
+    self.assertEqual(list(actual["a"].values()), list(expected["a"].values()))
+
+
 if __name__ == "__main__":
   unittest.main()

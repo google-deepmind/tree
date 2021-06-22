@@ -1,6 +1,6 @@
 # Description:
 #   Tree provides utilities for working with nested data structures.
-
+# load_pybind_extension
 load(
     "//tree:build_defs.bzl",
     "COMPAT_USERS",
@@ -21,6 +21,8 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         ":_tree",  # build_cleaner:keep
+        ":experimental",
+        ":sequence",
     ],
 )
 
@@ -40,6 +42,13 @@ tree_py_extension(
         "@pybind11_archive//:pybind11",
         "@python_headers",
     ],
+)
+
+py_library(
+    name = "sequence",
+    srcs = ["sequence.py"],
+    srcs_version = "PY2AND3",
+    deps = [":_tree"],
 )
 
 tree_py_test(
