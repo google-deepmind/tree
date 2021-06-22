@@ -20,7 +20,7 @@ py_library(
     srcs_version = "PY2AND3",
     visibility = ["//visibility:public"],
     deps = [
-        ":_tree",
+        ":_tree",  # build_cleaner:keep
     ],
 )
 
@@ -75,6 +75,6 @@ py_library(
         ":compat_users",
     ],
     deps = [
-        ":tree",
+        ":tree",  # build_cleaner:keep
     ],
 )

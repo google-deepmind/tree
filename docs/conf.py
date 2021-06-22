@@ -52,6 +52,7 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.linkcode',
     'sphinx.ext.napoleon',
+    'sphinx.ext.doctest'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -81,6 +82,14 @@ html_theme_options = {
     # 'collapse_navigation': False,
     # 'sticky_navigation': False,
 }
+
+# -- Options for doctest -----------------------------------------------------
+
+doctest_global_setup = '''
+import collections
+import numpy as np
+import tree
+'''
 
 # -- Source code links -------------------------------------------------------
 

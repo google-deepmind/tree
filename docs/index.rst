@@ -8,6 +8,7 @@ Tree Documentation
 
    api
    changes
+   recipes
 
 ``tree`` is a library for working with nested data structures. In a way,
 ``tree`` generalizes the builtin :func:`map` function which only supports 
