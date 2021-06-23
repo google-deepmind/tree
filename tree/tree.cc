@@ -14,14 +14,13 @@ limitations under the License.
 ==============================================================================*/
 #include "tree/tree.h"
 
+#include <functional>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 
 // logging
-#include "absl/memory/memory.h"
-#include "absl/strings/str_cat.h"
-#include "absl/strings/string_view.h"
 #include "pybind11/pybind11.h"
 
 #ifdef LOG
@@ -59,11 +58,32 @@ bool IsString(PyObject* o) {
   return PyBytes_Check(o) || PyByteArray_Check(o) || PyUnicode_Check(o);
 }
 
+void AddToStringStream(std::ostringstream&) {}
+
+template <typename T, typename... Args>
+void AddToStringStream(std::ostringstream& sstream, T&& arg, Args&&... args) {
+  sstream << std::forward<T>(arg);
+  AddToStringStream(sstream, std::forward<Args>(args)...);
+}
+
+template <typename... Args>
+std::string StrCat(Args&&... args) {
+  std::ostringstream sstream;
+  AddToStringStream(sstream, std::forward<Args>(args)...);
+  return sstream.str();
+}
+
+template<typename T>
+std::unique_ptr<T> make_unique_from_py_object_ptr(PyObject* arg)
+{
+    return std::unique_ptr<T>(new T(arg));
+}
+
 // Equivalent to Python's 'o.__class__.__name__'
 // Note that '__class__' attribute is set only in new-style classes.
 // A lot of tensorflow code uses __class__ without checks, so it seems like
 // we only support new-style classes.
-absl::string_view GetClassName(PyObject* o) {
+std::string GetClassName(PyObject* o) {
   // __class__ is equivalent to type() for new style classes.
   // type() is equivalent to PyObject_Type()
   // (https://docs.python.org/3.5/c-api/object.html#c.PyObject_Type)
@@ -73,10 +93,10 @@ absl::string_view GetClassName(PyObject* o) {
 
   // __name__ is the value of `tp_name` after the last '.'
   // (https://docs.python.org/2/c-api/typeobj.html#c.PyTypeObject.tp_name)
-  absl::string_view name(type->tp_name);
+  std::string name(type->tp_name);
   size_t pos = name.rfind('.');
-  if (pos != absl::string_view::npos) {
-    name.remove_prefix(pos + 1);
+  if (pos != std::string::npos) {
+    name.erase(0, pos + 1);
   }
   return name;
 }
@@ -89,7 +109,7 @@ std::string PyObjectToString(PyObject* o) {
   if (str) {
     std::string s(PyUnicode_AsUTF8(str));
     Py_DECREF(str);
-    return absl::StrCat("type=", GetClassName(o), " str=", s);
+    return StrCat("type=", GetClassName(o), " str=", s);
   } else {
     return "<failed to execute str() on object>";
   }
@@ -409,13 +429,13 @@ class AttrsValueIterator : public ValueIterator {
 
 ValueIteratorPtr GetValueIterator(PyObject* nested) {
   if (PyDict_Check(nested)) {
-    return absl::make_unique<DictValueIterator>(nested);
+    return make_unique_from_py_object_ptr<DictValueIterator>(nested);
   } else if (IsMappingHelper(nested)) {
-    return absl::make_unique<MappingValueIterator>(nested);
+    return make_unique_from_py_object_ptr<MappingValueIterator>(nested);
   } else if (IsAttrsHelper(nested)) {
-    return absl::make_unique<AttrsValueIterator>(nested);
+    return make_unique_from_py_object_ptr<AttrsValueIterator>(nested);
   } else {
-    return absl::make_unique<SequenceValueIterator>(nested);
+    return make_unique_from_py_object_ptr<SequenceValueIterator>(nested);
   }
 }
 
@@ -466,7 +486,7 @@ void SetDifferentKeysError(PyObject* dict1, PyObject* dict2,
     return;
   }
   *is_type_error = false;
-  *error_msg = absl::StrCat(
+  *error_msg = StrCat(
       "The two dictionaries don't have the same set of keys. "
       "First structure has keys ",
       PyObjectToString(k1.get()), ", while second structure has keys ",
@@ -495,9 +515,9 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
     std::string non_seq_str =
         is_seq1 ? PyObjectToString(o2) : PyObjectToString(o1);
     *is_type_error = false;
-    *error_msg = absl::StrCat("Substructure \"", seq_str,
-                              "\" is a sequence, while substructure \"",
-                              non_seq_str, "\" is not");
+    *error_msg = StrCat("Substructure \"", seq_str,
+                        "\" is a sequence, while substructure \"", non_seq_str,
+                        "\" is not");
     return true;
   }
 
@@ -540,7 +560,7 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
       Py_DECREF(same_tuples);
       if (not_same_tuples) {
         *is_type_error = true;
-        *error_msg = absl::StrCat(
+        *error_msg = StrCat(
             "The two namedtuples don't have the same sequence type. "
             "First structure ",
             PyObjectToString(o1), " has type ", type1->tp_name,
@@ -557,7 +577,7 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
                   and dict compare equal. */
                && !(IsMappingHelper(o1) && IsMappingHelper(o2))) {
       *is_type_error = true;
-      *error_msg = absl::StrCat(
+      *error_msg = StrCat(
           "The two namedtuples don't have the same sequence type. "
           "First structure ",
           PyObjectToString(o1), " has type ", type1->tp_name,
@@ -623,10 +643,10 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
       return true;
     } else {
       *is_type_error = false;
-      *error_msg = absl::StrCat(
-          "The two structures don't have the same number of elements. ",
-          "First structure: ", PyObjectToString(o1),
-          ". Second structure: ", PyObjectToString(o2));
+      *error_msg =
+          StrCat("The two structures don't have the same number of elements. ",
+                 "First structure: ", PyObjectToString(o1),
+                 ". Second structure: ", PyObjectToString(o2));
       return true;
     }
   }
@@ -722,7 +742,7 @@ PyObject* SameNamedtuples(PyObject* o1, PyObject* o2) {
     Py_RETURN_FALSE;
   }
 
-  if (GetClassName(o1).compare(GetClassName(o2)) == 0) {
+  if (GetClassName(o1) == GetClassName(o2)) {
     Py_RETURN_TRUE;
   } else {
     Py_RETURN_FALSE;
@@ -741,10 +761,10 @@ void AssertSameStructure(PyObject* o1, PyObject* o2, bool check_types) {
   if (!error_msg.empty()) {
     PyErr_SetString(
         is_type_error ? PyExc_TypeError : PyExc_ValueError,
-        absl::StrCat(
-            "The two structures don't have the same nested structure.\n\n",
-            "First structure: ", PyObjectToString(o1), "\n\nSecond structure: ",
-            PyObjectToString(o2), "\n\nMore specifically: ", error_msg)
+        StrCat("The two structures don't have the same nested structure.\n\n",
+               "First structure: ", PyObjectToString(o1),
+               "\n\nSecond structure: ", PyObjectToString(o2),
+               "\n\nMore specifically: ", error_msg)
             .c_str());
   }
 }
