@@ -1015,7 +1015,7 @@ class NestTest(parameterized.TestCase):
          (1, [2]), 1, [2], 2, [3, (4, 5, 6)], 3, (4, 5, 6)],
         visited)
 
-  def testMapStructureAcrossSubtrees(self):
+  def testMapStructureAcrossSubtreesDict(self):
     shallow = {"a": 1, "b": {"c": 2}}
     deep1 = {"a": 2, "b": {"c": 3, "d": 2}, "e": 4}
     deep2 = {"a": 3, "b": {"c": 2, "d": 3}, "e": 1}
@@ -1028,6 +1028,43 @@ class NestTest(parameterized.TestCase):
     expected = {"a": (2, 3), "b": {"c": (3, 2)}}
     self.assertEqual(concatenated, expected)
 
+  def testMapStructureAcrossSubtreesNoneValues(self):
+    shallow = [1, [None]]
+    deep1 = [1, [2, 3]]
+    deep2 = [2, [3, 4]]
+    summed = tree.map_structure_up_to(
+        shallow, lambda *args: sum(args), deep1, deep2)
+    expected = [3, [5]]
+    self.assertEqual(summed, expected)
+
+  def testMapStructureAcrossSubtreesList(self):
+    shallow = [1, [1]]
+    deep1 = [1, [2, 3]]
+    deep2 = [2, [3, 4]]
+    summed = tree.map_structure_up_to(
+        shallow, lambda *args: sum(args), deep1, deep2)
+    expected = [3, [5]]
+    self.assertEqual(summed, expected)
+
+  def testMapStructureAcrossSubtreesTuple(self):
+    shallow = (1, (1,))
+    deep1 = (1, (2, 3))
+    deep2 = (2, (3, 4))
+    summed = tree.map_structure_up_to(
+        shallow, lambda *args: sum(args), deep1, deep2)
+    expected = (3, (5,))
+    self.assertEqual(summed, expected)
+
+  def testMapStructureAcrossSubtreesNamedTuple(self):
+    Foo = collections.namedtuple("Foo", ["x", "y"])
+    Bar = collections.namedtuple("Bar", ["x"])
+    shallow = Bar(1)
+    deep1 = Foo(1, (1, 0))
+    deep2 = Foo(2, (2, 0))
+    summed = tree.map_structure_up_to(
+        shallow, lambda *args: sum(args), deep1, deep2)
+    expected = Bar(3)
+    self.assertEqual(summed, expected)
 
 if __name__ == "__main__":
   unittest.main()
