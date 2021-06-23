@@ -40,10 +40,6 @@ namespace py = pybind11;
 namespace tree {
 namespace {
 
-struct DecrementsPyRefcount {
-  void operator()(PyObject* p) const { Py_DECREF(p); }
-};
-
 // PyObjectPtr wraps an underlying Python object and decrements the
 // reference count in the destructor.
 //
@@ -256,21 +252,6 @@ int IsSequenceHelper(PyObject* o) {
   return check_cache->CachedLookup(o);
 }
 
-// ValueIterator interface
-class ValueIterator {
- public:
-  virtual ~ValueIterator() {}
-  virtual PyObjectPtr next() = 0;
-
-  bool valid() const { return is_valid_; }
-
- protected:
-  void invalidate() { is_valid_ = false; }
-
- private:
-  bool is_valid_ = true;
-};
-
 using ValueIteratorPtr = std::unique_ptr<ValueIterator>;
 
 // Iterate through dictionaries in a deterministic order by sorting the
@@ -407,17 +388,6 @@ class AttrsValueIterator : public ValueIterator {
   PyObjectPtr iter_;
 };
 
-ValueIteratorPtr GetValueIterator(PyObject* nested) {
-  if (PyDict_Check(nested)) {
-    return absl::make_unique<DictValueIterator>(nested);
-  } else if (IsMappingHelper(nested)) {
-    return absl::make_unique<MappingValueIterator>(nested);
-  } else if (IsAttrsHelper(nested)) {
-    return absl::make_unique<AttrsValueIterator>(nested);
-  } else {
-    return absl::make_unique<SequenceValueIterator>(nested);
-  }
-}
 
 bool FlattenHelper(
     PyObject* nested, PyObject* list,
@@ -746,6 +716,18 @@ void AssertSameStructure(PyObject* o1, PyObject* o2, bool check_types) {
             "First structure: ", PyObjectToString(o1), "\n\nSecond structure: ",
             PyObjectToString(o2), "\n\nMore specifically: ", error_msg)
             .c_str());
+  }
+}
+
+ValueIteratorPtr GetValueIterator(PyObject* nested) {
+  if (PyDict_Check(nested)) {
+    return absl::make_unique<DictValueIterator>(nested);
+  } else if (IsMappingHelper(nested)) {
+    return absl::make_unique<MappingValueIterator>(nested);
+  } else if (IsAttrsHelper(nested)) {
+    return absl::make_unique<AttrsValueIterator>(nested);
+  } else {
+    return absl::make_unique<SequenceValueIterator>(nested);
   }
 }
 

@@ -1066,5 +1066,10 @@ class NestTest(parameterized.TestCase):
     expected = Bar(3)
     self.assertEqual(summed, expected)
 
+  def testNoneNodeIncluded(self):
+    structure = ((1, None))
+    self.assertEqual(tree.flatten(structure), [1, None])
+
+
 if __name__ == "__main__":
   unittest.main()
