@@ -26,6 +26,7 @@
 
 # pylint: disable=g-bad-import-order
 # pylint: disable=g-import-not-at-top
+import datetime
 import inspect
 import os
 import sys
@@ -37,7 +38,7 @@ import tree
 # -- Project information -----------------------------------------------------
 
 project = 'Tree'
-copyright = '2019, DeepMind'  # pylint: disable=redefined-builtin
+copyright = f'{datetime.date.today().year}, DeepMind'  # pylint: disable=redefined-builtin
 author = 'DeepMind'
 
 # -- General configuration ---------------------------------------------------
