@@ -21,7 +21,6 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         ":_tree",  # build_cleaner:keep
-        ":experimental",
         ":sequence",
     ],
 )
