@@ -1066,6 +1066,25 @@ class NestTest(parameterized.TestCase):
     expected = Bar(3)
     self.assertEqual(summed, expected)
 
+  def testMapStructureAcrossSubtreesListTuple(self):
+    # Tuples and lists can be used interchangeably between shallow structure
+    # and input structures. Output takes on type of the shallow structure
+    shallow = [1, (1,)]
+    deep1 = [1, [2, 3]]
+    deep2 = [2, [3, 4]]
+    summed = tree.map_structure_up_to(shallow, lambda *args: sum(args), deep1,
+                                      deep2)
+    expected = [3, (5,)]
+    self.assertEqual(summed, expected)
+
+    shallow = [1, [1]]
+    deep1 = [1, (2, 3)]
+    deep2 = [2, (3, 4)]
+    summed = tree.map_structure_up_to(shallow, lambda *args: sum(args), deep1,
+                                      deep2)
+    expected = [3, [5]]
+    self.assertEqual(summed, expected)
+
   def testNoneNodeIncluded(self):
     structure = ((1, None))
     self.assertEqual(tree.flatten(structure), [1, None])
