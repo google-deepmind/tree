@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#include "tree/tree.h"
+#include "tree.h"
 
 #include <memory>
 #include <string>
@@ -22,7 +22,7 @@ limitations under the License.
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "pybind11/pybind11.h"
+#include <pybind11/pybind11.h>
 
 #ifdef LOG
 #define LOG_WARNING(w) LOG(WARNING) << w;

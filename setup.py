@@ -13,33 +13,23 @@
 # limitations under the License.
 # ==============================================================================
 """Setup for pip package."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import os
-import posixpath
-import re
 import shutil
+import subprocess
 import sys
 
-from distutils import sysconfig
 import setuptools
 from setuptools.command import build_ext
 
-
 here = os.path.dirname(os.path.abspath(__file__))
-
-
-IS_WINDOWS = sys.platform.startswith('win')
 
 
 def _get_tree_version():
   """Parse the version string from tree/__init__.py."""
   with open(os.path.join(here, 'tree', '__init__.py')) as f:
     try:
-      version_line = next(
-          line for line in f if line.startswith('__version__'))
+      version_line = next(line for line in f if line.startswith('__version__'))
     except StopIteration:
       raise ValueError('__version__ not defined in tree/__init__.py')
     else:
@@ -56,63 +46,64 @@ def _parse_requirements(path):
     ]
 
 
-class BazelExtension(setuptools.Extension):
-  """A C/C++ extension that is defined as a Bazel BUILD target."""
+class CMakeExtension(setuptools.Extension):
+  """An extension with no sources.
 
-  def __init__(self, bazel_target):
-    self.bazel_target = bazel_target
-    self.relpath, self.target_name = (
-        posixpath.relpath(bazel_target, '//').split(':'))
-    ext_name = os.path.join(
-        self.relpath.replace(posixpath.sep, os.path.sep), self.target_name)
-    setuptools.Extension.__init__(self, ext_name, sources=[])
+  We do not want distutils to handle any of the compilation (instead we rely
+  on CMake), so we always pass an empty list to the constructor.
+  """
+
+  def __init__(self, name, source_dir=''):
+    super().__init__(name, sources=[])
+    self.source_dir = os.path.abspath(source_dir)
 
 
-class BuildBazelExtension(build_ext.build_ext):
-  """A command that runs Bazel to build a C/C++ extension."""
+class BuildCMakeExtension(build_ext.build_ext):
+  """Our custom build_ext command.
+
+  Uses CMake to build extensions instead of a bare compiler (e.g. gcc, clang).
+  """
 
   def run(self):
+    self._check_build_environment()
     for ext in self.extensions:
-      self.bazel_build(ext)
-    build_ext.build_ext.run(self)
+      self.build_extension(ext)
 
-  def bazel_build(self, ext):
-    with open('WORKSPACE', 'r') as f:
-      workspace_contents = f.read()
+  def _check_build_environment(self):
+    """Check for required build tools: CMake, C++ compiler, and python dev."""
+    try:
+      subprocess.check_call(['cmake', '--version'])
+    except OSError as e:
+      ext_names = ', '.join(e.name for e in self.extensions)
+      raise RuntimeError(
+          f'CMake must be installed to build the following extensions: {ext_names}'
+      ) from e
+    print('Found CMake')
 
-    with open('WORKSPACE', 'w') as f:
-      f.write(re.sub(
-          r'(?<=path = ").*(?=",  # May be overwritten by setup\.py\.)',
-          sysconfig.get_python_inc().replace(os.path.sep, posixpath.sep),
-          workspace_contents))
-
-    if not os.path.exists(self.build_temp):
-      os.makedirs(self.build_temp)
-
-    bazel_argv = [
-        'bazel',
-        'build',
-        ext.bazel_target,
-        '--symlink_prefix=' + os.path.join(self.build_temp, 'bazel-'),
-        '--compilation_mode=' + ('dbg' if self.debug else 'opt'),
+  def build_extension(self, ext):
+    extension_dir = os.path.abspath(
+        os.path.dirname(self.get_ext_fullpath(ext.name)))
+    build_cfg = 'Debug' if self.debug else 'Release'
+    cmake_args = [
+        f'-DPython3_EXECUTABLE={sys.executable}',
+        f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extension_dir}',
+        f'-DCMAKE_BUILD_TYPE={build_cfg}'
     ]
+    os.makedirs(self.build_temp, exist_ok=True)
+    subprocess.check_call(
+        ['cmake', ext.source_dir] + cmake_args, cwd=self.build_temp)
+    subprocess.check_call(
+        ['cmake', '--build', '.', f'-j{os.cpu_count()}', '--config', build_cfg],
+        cwd=self.build_temp)
 
-    if IS_WINDOWS:
-      # Link with python*.lib.
-      for library_dir in self.library_dirs:
-        bazel_argv.append('--linkopt=/LIBPATH:' + library_dir)
-
-    self.spawn(bazel_argv)
-
-    shared_lib_suffix = '.dll' if IS_WINDOWS else '.so'
-    ext_bazel_bin_path = os.path.join(
-        self.build_temp, 'bazel-bin',
-        ext.relpath, ext.target_name + shared_lib_suffix)
-    ext_dest_path = self.get_ext_fullpath(ext.name)
-    ext_dest_dir = os.path.dirname(ext_dest_path)
-    if not os.path.exists(ext_dest_dir):
-      os.makedirs(ext_dest_dir)
-    shutil.copyfile(ext_bazel_bin_path, ext_dest_path)
+    # Force output to <extension_dir>/. Amends CMake multigenerator output paths
+    # on Windows and avoids Debug/ and Release/ subdirs, which is CMake default.
+    tree_dir = os.path.join(extension_dir, 'tree')  # pylint:disable=unreachable
+    for cfg in ('Release', 'Debug'):
+      cfg_dir = os.path.join(extension_dir, cfg)
+      if os.path.isdir(cfg_dir):
+        for f in os.listdir(cfg_dir):
+          shutil.move(os.path.join(cfg_dir, f), tree_dir)
 
 
 setuptools.setup(
@@ -128,8 +119,8 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     tests_require=_parse_requirements('requirements-test.txt'),
     test_suite='tree',
-    cmdclass=dict(build_ext=BuildBazelExtension),
-    ext_modules=[BazelExtension('//tree:_tree')],
+    cmdclass=dict(build_ext=BuildCMakeExtension),
+    ext_modules=[CMakeExtension('_tree', source_dir='tree')],
     zip_safe=False,
     # PyPI package information.
     classifiers=[

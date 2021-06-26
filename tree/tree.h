@@ -17,7 +17,8 @@ limitations under the License.
 #define TREE_H_
 
 #include <memory>
-#include <Python.h>
+
+#include <pybind11/pybind11.h>
 
 namespace tree {
 
