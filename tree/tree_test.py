@@ -34,8 +34,12 @@ STRUCTURE_DIFFERENT_NESTING = (((1, 2), 3), 4, 5, (6,))
 class DoctestTest(parameterized.TestCase):
 
   def testDoctest(self):
+    extraglobs = {
+        "collections": collections,
+        "tree": tree,
+    }
     num_failed, num_attempted = doctest.testmod(
-        tree, extraglobs={"tree": tree}, optionflags=doctest.ELLIPSIS)
+        tree, extraglobs=extraglobs, optionflags=doctest.ELLIPSIS)
     self.assertGreater(num_attempted, 0, "No doctests found.")
     self.assertEqual(num_failed, 0, "{} doctests failed".format(num_failed))
 

@@ -15,16 +15,15 @@
 
 """Functions for working with nested data structures."""
 
-import collections
 from collections import abc as collections_abc
-import functools
 import logging
 import sys
-import types
-from tree.sequence import _is_attrs
-from tree.sequence import _is_namedtuple
-from tree.sequence import _sequence_like
-from tree.sequence import _sorted
+from typing import Mapping, Sequence, Text, TypeVar, Union
+
+from .sequence import _is_attrs
+from .sequence import _is_namedtuple
+from .sequence import _sequence_like
+from .sequence import _sorted
 
 # pylint: disable=g-import-not-at-top
 try:
@@ -33,13 +32,6 @@ try:
 except ImportError:
   class ObjectProxy(object):
     """Stub-class for `wrapt.ObjectProxy``."""
-
-try:
-  from typing import Any, Mapping, Sequence, Union, Text, TypeVar
-except ImportError:
-  typing_available = False
-else:
-  typing_available = True
 
 try:
   from tree import _tree
@@ -96,28 +88,26 @@ _IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ = (
     "If shallow structure is a sequence, input must also be a sequence. "
     "Input has type: {}.")
 
-if typing_available:
-  K = TypeVar("K")
-  V = TypeVar("V")
-  # A generic monomorphic structure type, e.g. ``StructureKV[Text, int]``
-  # is an arbitrarily nested structure where keys must be of type ``Text``
-  # and values are integers.
-  # pytype: disable=not-supported-yet
-  # TODO(b/146184840): Remove pytype disable when recursive types supported
-  StructureKV = Union[
-      Sequence["StructureKV[K, V]"],
-      Mapping[K, "StructureKV[K, V]"],
-      V,
-  ]
-  # pytype: enable=not-supported-yet
-  # A specialization of ``StructureKV`` for the common case of ``Text`` keys.
-  try:
-    Structure = StructureKV[Text, V]
-  except TypeError:
-    # Older Python 3.5 and 3.6 releases do not always support such use
-    # of generics. Specialize ``StructureKV`` manually.
-    Structure = Union[Sequence["Structure[V]"], Mapping[Text, "Structure[V]"],
-                      V]
+K = TypeVar("K")
+V = TypeVar("V")
+# A generic monomorphic structure type, e.g. ``StructureKV[Text, int]``
+# is an arbitrarily nested structure where keys must be of type ``Text``
+# and values are integers.
+# pytype: disable=not-supported-yet
+# TODO(b/146184840): Remove disable= when pytype supports recursive types.
+StructureKV = Union[
+    Sequence["StructureKV[K, V]"],
+    Mapping[K, "StructureKV[K, V]"],
+    V,
+]
+# pytype: enable=not-supported-yet
+# A specialization of ``StructureKV`` for the common case of ``Text`` keys.
+try:
+  Structure = StructureKV[Text, V]
+except TypeError:
+  # Older Python 3.5 and 3.6 releases do not always support such use
+  # of generics. Specialize ``StructureKV`` manually.
+  Structure = Union[Sequence["Structure[V]"], Mapping[Text, "Structure[V]"], V]
 
 
 def _get_attrs_items(obj):
