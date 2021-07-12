@@ -174,8 +174,8 @@ py::object GetWraptObjectProxyTypeUncached() {
 }
 
 py::object GetWraptObjectProxyType() {
-  static py::object type = GetWraptObjectProxyTypeUncached();
-  return type;
+  // TODO(gregthornton): Restore caching when deadlock issue is fixed.
+  return GetWraptObjectProxyTypeUncached();
 }
 
 // Returns 1 if `o` is considered a mapping for the purposes of Flatten().
