@@ -800,13 +800,6 @@ class NestTest(parameterized.TestCase):
     input_tree = {"a": "A", "b": "B", "c": "C"}
     shallow_tree = {"a": 1, "c": 2}
 
-    with self.assertRaisesWithLiteralMatch(  # pylint: disable=g-error-prone-assert-raises
-        ValueError,
-        tree._STRUCTURES_HAVE_MISMATCHING_LENGTHS.format(
-            input_length=len(input_tree),
-            shallow_length=len(shallow_tree))):
-      get_paths_and_values(shallow_tree, input_tree)
-
     # Using non-iterable elements.
     input_tree = [0]
     shallow_tree = 9
