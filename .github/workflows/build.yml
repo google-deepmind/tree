@@ -1,0 +1,123 @@
+name: build
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  release:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  sdist:
+    name: sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - name: Create sdist
+        run: python setup.py sdist
+        shell: bash
+      - name: Directory listing
+        run: ls -lh dist/dm-tree*.tar.gz
+        shell: bash
+      - uses: actions/upload-artifact@v2
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
+        with:
+          name: dm-tree-${{ github.workflow }}-${{ github.run_number }}
+          path: dist/dm-tree*.tar.gz
+
+  wheel-x86_64:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        python_tag: [cp36, cp37, cp38, cp39, cp310]
+        include:
+          - os: windows-latest
+            os_tag: win_amd64
+          - os: ubuntu-latest
+            os_tag: manylinux_x86_64
+          - os: macos-latest
+            os_tag: macosx_x86_64
+
+    name: "wheel: ${{ matrix.python_tag }}-${{ matrix.os_tag }}"
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+
+      - name: Install prerequisites
+        run: |
+          set -xe
+          pwd
+          python --version
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install cibuildwheel
+        shell: bash
+
+      - name: Build and test
+        run: set -xe && python -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_BUILD: ${{ matrix.python_tag }}-${{ matrix.os_tag }}
+          CIBW_BUILD_VERBOSITY: 3
+          CIBW_PROJECT_REQUIRES_PYTHON: ">=3.6"
+          CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux2010_x86_64
+          CIBW_TEST_REQUIRES: pytest
+          CIBW_BEFORE_TEST: pip install -r requirements-test.txt
+          CIBW_TEST_COMMAND: pytest --pyargs tree
+        shell: bash
+
+      - name: Directory listing
+        run: ls -lh wheelhouse/dm_tree*.whl
+        shell: bash
+
+      - uses: actions/upload-artifact@v2
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
+        with:
+          name: dm-tree-${{ github.workflow }}-${{ github.run_number }}
+          path: wheelhouse/dm_tree*.whl
+
+  wheel-apple_silicon:
+    strategy:
+      matrix:
+        python_tag: [cp38, cp39, cp310]
+        macos_arch: [arm64, universal2]
+
+    name: "wheel: ${{ matrix.python_tag }}-macosx_${{ matrix.macos_arch }}"
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+
+      - name: Install prerequisites
+        run: |
+          set -xe
+          pwd
+          python --version
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install cibuildwheel
+        shell: bash
+
+      - name: Build and test
+        run: set -xe && python -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_BUILD: ${{ matrix.python_tag }}-macosx_${{ matrix.macos_arch }}
+          CIBW_BUILD_VERBOSITY: 3
+          CIBW_ARCHS_MACOS: ${{ matrix.macos_arch }}
+          CIBW_TEST_REQUIRES: pytest
+          CIBW_BEFORE_TEST: pip install -r requirements-test.txt
+          CIBW_TEST_COMMAND: "if [ \"${CIBW_ARCHS_MACOS}\" = \"universal2\" ]; then pytest --pyargs tree; fi"
+        shell: bash
+
+      - name: Directory listing
+        run: ls -lh wheelhouse/dm_tree*.whl
+        shell: bash
+
+      - uses: actions/upload-artifact@v2
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
+        with:
+          name: dm-tree-${{ github.workflow }}-${{ github.run_number }}
+          path: wheelhouse/dm_tree*.whl

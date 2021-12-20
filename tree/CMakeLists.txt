@@ -70,17 +70,24 @@ set (BUILD_TESTING OFF)
 # Include abseil-cpp.
 set(ABSEIL_VER 20210324.2)
 include(ExternalProject)
+set(ABSEIL_CMAKE_ARGS
+    "-DCMAKE_INSTALL_PREFIX=${CMAKE_SOURCE_DIR}/abseil-cpp"
+    "-DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}"
+    "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+    "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}"
+    "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+    "-DCMAKE_POSITION_INDEPENDENT_CODE=${CMAKE_POSITION_INDEPENDENT_CODE}"
+    "-DLIBRARY_OUTPUT_PATH=${CMAKE_SOURCE_DIR}/abseil-cpp/lib")
+if(DEFINED CMAKE_OSX_ARCHITECTURES)
+    set(ABSEIL_CMAKE_ARGS
+        ${ABSEIL_CMAKE_ARGS}
+        "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}")
+endif()
 ExternalProject_Add(abseil-cpp
   GIT_REPOSITORY    https://github.com/abseil/abseil-cpp.git
   GIT_TAG           ${ABSEIL_VER}
   PREFIX            ${CMAKE_SOURCE_DIR}/abseil-cpp
-  CMAKE_ARGS       -DCMAKE_INSTALL_PREFIX=${CMAKE_SOURCE_DIR}/abseil-cpp
-                   -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-                   -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                   -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
-                   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-                   -DCMAKE_POSITION_INDEPENDENT_CODE=${CMAKE_POSITION_INDEPENDENT_CODE}
-                   -DLIBRARY_OUTPUT_PATH=${CMAKE_SOURCE_DIR}/abseil-cpp/lib
+  CMAKE_ARGS        ${ABSEIL_CMAKE_ARGS}
 )
 ExternalProject_Get_Property(abseil-cpp install_dir)
 set(abseil_install_dir ${install_dir})

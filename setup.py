@@ -15,9 +15,11 @@
 """Setup for pip package."""
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
+import sysconfig
 
 import setuptools
 from setuptools.command import build_ext
@@ -85,10 +87,23 @@ class BuildCMakeExtension(build_ext.build_ext):
         os.path.dirname(self.get_ext_fullpath(ext.name)))
     build_cfg = 'Debug' if self.debug else 'Release'
     cmake_args = [
+        f'-DPython3_ROOT_DIR={sys.prefix}',
         f'-DPython3_EXECUTABLE={sys.executable}',
         f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extension_dir}',
         f'-DCMAKE_BUILD_TYPE={build_cfg}'
     ]
+    if platform.system() != 'Windows':
+      cmake_args.extend([
+          f'-DPython3_LIBRARY={sysconfig.get_paths()["stdlib"]}',
+          f'-DPython3_INCLUDE_DIR={sysconfig.get_paths()["include"]}',
+      ])
+    if platform.system() == 'Darwin' and os.environ.get('ARCHFLAGS'):
+      osx_archs = []
+      if '-arch x86_64' in os.environ['ARCHFLAGS']:
+        osx_archs.append('x86_64')
+      if '-arch arm64' in os.environ['ARCHFLAGS']:
+        osx_archs.append('arm64')
+      cmake_args.append(f'-DCMAKE_OSX_ARCHITECTURES={";".join(osx_archs)}')
     os.makedirs(self.build_temp, exist_ok=True)
     subprocess.check_call(
         ['cmake', ext.source_dir] + cmake_args, cwd=self.build_temp)
