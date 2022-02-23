@@ -90,7 +90,11 @@ def _sequence_like(instance, args):
       instance_type = type(instance.__wrapped__)
     else:
       instance_type = type(instance)
-    return instance_type(*args)
+    try:
+      return instance_type(*args)
+    except Exception as e:
+      raise TypeError(
+          f"Couldn't traverse {instance!r} with arguments {args}") from e
   elif isinstance(instance, ObjectProxy):
     # For object proxies, first create the underlying type and then re-wrap it
     # in the proxy type.
