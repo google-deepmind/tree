@@ -91,7 +91,14 @@ def _sequence_like(instance, args):
     else:
       instance_type = type(instance)
     try:
-      return instance_type(*args)
+      if _is_attrs(instance):
+        return instance_type(
+            **{
+                attr.name: arg
+                for attr, arg in zip(instance_type.__attrs_attrs__, args)
+            })
+      else:
+        return instance_type(*args)
     except Exception as e:
       raise TypeError(
           f"Couldn't traverse {instance!r} with arguments {args}") from e
