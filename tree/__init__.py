@@ -90,17 +90,16 @@ _IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ = (
 
 K = TypeVar("K")
 V = TypeVar("V")
+
 # A generic monomorphic structure type, e.g. ``StructureKV[Text, int]``
 # is an arbitrarily nested structure where keys must be of type ``Text``
 # and values are integers.
-# pytype: disable=not-supported-yet
-# TODO(b/146184840): Remove disable= when pytype supports recursive types.
 StructureKV = Union[
     Sequence["StructureKV[K, V]"],
     Mapping[K, "StructureKV[K, V]"],
     V,
 ]
-# pytype: enable=not-supported-yet
+
 # A specialization of ``StructureKV`` for the common case of ``Text`` keys.
 try:
   Structure = StructureKV[Text, V]
