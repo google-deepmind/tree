@@ -2,6 +2,13 @@
 Changelog
 #########
 
+Version 0.1.7
+=============
+
+Released 2022-04-10
+
+* The build is now done via CMake instead of Bazel
+
 Version 0.1.6
 =============
 
