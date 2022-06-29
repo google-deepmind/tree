@@ -405,8 +405,9 @@ def map_structure(func, *structures, **kwargs):  # pylint: disable=redefined-bui
     will use the same types as ``structures[0]``.
 
   Raises:
-    TypeError: If `func` is not callable or if the structures have different
-      layout.
+    TypeError: If `func` is not callable.
+    ValueError: If the two structures do not have the same number of elements or
+      if the two structures are not nested in the same way.
     TypeError: If `check_types` is `True` and any two `structures`
       differ in the types of their components.
     ValueError: If no structures were given or if a keyword argument other
