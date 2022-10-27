@@ -51,7 +51,7 @@ if(APPLE)
 endif()
 
 # Fetch pybind to be able to use pybind11_add_module symbol.
-set(PYBIND_VER v2.6.2)
+set(PYBIND_VER v2.10.1)
 include(FetchContent)
 FetchContent_Declare(
   pybind11
