@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 #include "tree.h"
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
