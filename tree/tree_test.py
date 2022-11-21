@@ -471,6 +471,7 @@ class NestTest(parameterized.TestCase):
     self.assertEqual(nt.b[::-1], rev_nt.b)
 
   def testAssertShallowStructure(self):
+    # pylint:disable=g-error-prone-assert-raises
     inp_ab = ["a", "b"]
     inp_abc = ["a", "b", "c"]
     with self.assertRaisesRegex(
@@ -478,7 +479,7 @@ class NestTest(parameterized.TestCase):
         tree._STRUCTURES_HAVE_MISMATCHING_LENGTHS.format(
             input_length=len(inp_ab),
             shallow_length=len(inp_abc))):
-      tree._assert_shallow_structure(inp_abc, inp_ab)
+      tree.assert_shallow_structure(inp_abc, inp_ab)
 
     inp_ab1 = [(1, 1), (2, 2)]
     inp_ab2 = [[1, 1], [2, 2]]
@@ -487,9 +488,9 @@ class NestTest(parameterized.TestCase):
         tree._STRUCTURES_HAVE_MISMATCHING_TYPES.format(
             shallow_type=type(inp_ab2[0]),
             input_type=type(inp_ab1[0]))):
-      tree._assert_shallow_structure(shallow_tree=inp_ab2, input_tree=inp_ab1)
+      tree.assert_shallow_structure(shallow_tree=inp_ab2, input_tree=inp_ab1)
 
-    tree._assert_shallow_structure(inp_ab2, inp_ab1, check_types=False)
+    tree.assert_shallow_structure(inp_ab2, inp_ab1, check_types=False)
 
     inp_ab1 = {"a": (1, 1), "b": {"c": (2, 2)}}
     inp_ab2 = {"a": (1, 1), "b": {"d": (2, 2)}}
@@ -497,14 +498,15 @@ class NestTest(parameterized.TestCase):
     with self.assertRaisesWithLiteralMatch(
         ValueError,
         tree._SHALLOW_TREE_HAS_INVALID_KEYS.format(["d"])):
-      tree._assert_shallow_structure(inp_ab2, inp_ab1)
+      tree.assert_shallow_structure(inp_ab2, inp_ab1)
 
     inp_ab = collections.OrderedDict([("a", 1), ("b", (2, 3))])
     inp_ba = collections.OrderedDict([("b", (2, 3)), ("a", 1)])
-    tree._assert_shallow_structure(inp_ab, inp_ba)
+    tree.assert_shallow_structure(inp_ab, inp_ba)
+    # pylint:enable=g-error-prone-assert-raises
 
     # regression test for b/130633904
-    tree._assert_shallow_structure({0: "foo"}, ["foo"], check_types=False)
+    tree.assert_shallow_structure({0: "foo"}, ["foo"], check_types=False)
 
   def testFlattenUpTo(self):
     # Shallow tree ends at scalar.
