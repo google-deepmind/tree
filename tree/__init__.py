@@ -520,108 +520,7 @@ def _multiyield_flat_up_to(shallow_tree, *input_trees):
                      f"yielded was {paths[0]}.") from e
 
 
-def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
-  """Asserts that `shallow_tree` is a shallow structure of `input_tree`.
-
-  That is, this function recursively tests if each key in shallow_tree has its
-  corresponding key in input_tree.
-
-  Examples:
-
-  The following code will raise an exception:
-
-  >>> shallow_tree = {"a": "A", "b": "B"}
-  >>> input_tree = {"a": 1, "c": 2}
-  >>> _assert_shallow_structure(shallow_tree, input_tree)
-  Traceback (most recent call last):
-    ...
-  ValueError: The shallow_tree's keys are not a subset of the input_tree's ...
-
-  The following code will raise an exception:
-
-  >>> shallow_tree = ["a", "b"]
-  >>> input_tree = ["c", ["d", "e"], "f"]
-  >>> _assert_shallow_structure(shallow_tree, input_tree)
-  Traceback (most recent call last):
-    ...
-  ValueError: The two structures don't have the same sequence length. ...
-
-  By setting check_types=False, we drop the requirement that corresponding
-  nodes in shallow_tree and input_tree have to be the same type. Sequences
-  are treated equivalently to Mappables that map integer keys (indices) to
-  values. The following code will therefore not raise an exception:
-
-  >>> _assert_shallow_structure({0: "foo"}, ["foo"], check_types=False)
-
-  Args:
-    shallow_tree: an arbitrarily nested structure.
-    input_tree: an arbitrarily nested structure.
-    check_types: if `True` (default) the sequence types of `shallow_tree` and
-      `input_tree` have to be the same.
-
-  Raises:
-    TypeError: If `shallow_tree` is a sequence but `input_tree` is not.
-    TypeError: If the sequence types of `shallow_tree` are different from
-      `input_tree`. Only raised if `check_types` is `True`.
-    ValueError: If the sequence lengths of `shallow_tree` are different from
-      `input_tree`.
-  """
-  if is_nested(shallow_tree):
-    if not is_nested(input_tree):
-      raise TypeError(_IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ.format(
-          type(input_tree)))
-
-    if isinstance(shallow_tree, ObjectProxy):
-      shallow_type = type(shallow_tree.__wrapped__)
-    else:
-      shallow_type = type(shallow_tree)
-
-    if check_types and not isinstance(input_tree, shallow_type):
-      # Duck-typing means that nest should be fine with two different
-      # namedtuples with identical name and fields.
-      shallow_is_namedtuple = _is_namedtuple(shallow_tree, False)
-      input_is_namedtuple = _is_namedtuple(input_tree, False)
-      if shallow_is_namedtuple and input_is_namedtuple:
-        # pylint: disable=protected-access
-        if not _tree.same_namedtuples(shallow_tree, input_tree):
-          raise TypeError(_STRUCTURES_HAVE_MISMATCHING_TYPES.format(
-              input_type=type(input_tree),
-              shallow_type=shallow_type))
-        # pylint: enable=protected-access
-      elif not (isinstance(shallow_tree, collections_abc.Mapping)
-                and isinstance(input_tree, collections_abc.Mapping)):
-        raise TypeError(_STRUCTURES_HAVE_MISMATCHING_TYPES.format(
-            input_type=type(input_tree),
-            shallow_type=shallow_type))
-
-    if _num_elements(input_tree) != _num_elements(shallow_tree):
-      raise ValueError(
-          _STRUCTURES_HAVE_MISMATCHING_LENGTHS.format(
-              input_length=_num_elements(input_tree),
-              shallow_length=_num_elements(shallow_tree)))
-    elif _num_elements(input_tree) < _num_elements(shallow_tree):
-      raise ValueError(
-          _INPUT_TREE_SMALLER_THAN_SHALLOW_TREE.format(
-              input_size=_num_elements(input_tree),
-              shallow_size=_num_elements(shallow_tree)))
-
-    shallow_iter = _yield_sorted_items(shallow_tree)
-    input_iter = _yield_sorted_items(input_tree)
-
-    def get_matching_input_branch(shallow_key):
-      for input_key, input_branch in input_iter:
-        if input_key == shallow_key:
-          return input_branch
-
-      raise ValueError(_SHALLOW_TREE_HAS_INVALID_KEYS.format([shallow_key]))
-
-    for shallow_key, shallow_branch in shallow_iter:
-      input_branch = get_matching_input_branch(shallow_key)
-      _assert_shallow_structure(
-          shallow_branch, input_branch, check_types=check_types)
-
-
-def flatten_up_to(shallow_structure, input_structure, check_types=True):
+def flatten_up_to(shallow_structure, input_structure, **kwargs):
   """Flattens `input_structure` up to `shallow_structure`.
 
   All further nested components in `input_structure` are retained as-is.
@@ -644,8 +543,7 @@ def flatten_up_to(shallow_structure, input_structure, check_types=True):
     shallow_structure: A structure with the same (but possibly more shallow)
       layout as `input_structure`.
     input_structure: An arbitrarily nested structure.
-    check_types: If `True`, check that each node in shallow_tree has the
-      same type as the corresponding node in `input_structure`.
+    **kwargs: No valid kwargs.
 
   Returns:
     A list, the partially flattened version of `input_structure` wrt
@@ -654,18 +552,18 @@ def flatten_up_to(shallow_structure, input_structure, check_types=True):
   Raises:
     TypeError: If the layout of `shallow_structure` does not match that of
       `input_structure`.
-    TypeError: If `check_types` is `True` and `shallow_structure` and
-      `input_structure` differ in the types of their components.
   """
-  _assert_shallow_structure(
-      shallow_structure, input_structure, check_types=check_types)
+  if "check_types" in kwargs:
+    logging.warning("The use of `check_types` is deprecated and does not have "
+                    "any effect.")
+  del kwargs
   # Discard paths returned by _yield_flat_up_to.
   return [v for _, v in _yield_flat_up_to(shallow_structure, input_structure)]
 
 
 def flatten_with_path_up_to(shallow_structure,
                             input_structure,
-                            check_types=True):
+                            **kwargs):
   """Flattens `input_structure` up to `shallow_structure`.
 
   This is a combination of :func:`~tree.flatten_up_to` and
@@ -675,8 +573,7 @@ def flatten_with_path_up_to(shallow_structure,
     shallow_structure: A structure with the same (but possibly more shallow)
       layout as `input_structure`.
     input_structure: An arbitrarily nested structure.
-    check_types: If `True`, check that each node in shallow_tree has the
-      same type as the corresponding node in `input_structure`.
+    **kwargs: No valid kwargs.
 
   Returns:
     A list of ``(path, item)`` pairs corresponding to the partially flattened
@@ -687,11 +584,11 @@ def flatten_with_path_up_to(shallow_structure,
       `input_structure`.
     TypeError: If `input_structure` is or contains a mapping with non-sortable
       keys.
-    TypeError: If `check_types` is `True` and `shallow_structure` and
-      `input_structure` differ in the types of their components.
   """
-  _assert_shallow_structure(
-      shallow_structure, input_structure, check_types=check_types)
+  if "check_types" in kwargs:
+    logging.warning("The use of `check_types` is deprecated and does not have "
+                    "any effect.")
+  del kwargs
   return list(_yield_flat_up_to(shallow_structure, input_structure))
 
 
