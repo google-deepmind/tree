@@ -88,6 +88,10 @@ _IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ = (
     "If shallow structure is a sequence, input must also be a sequence. "
     "Input has type: {}.")
 
+_IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ_WITH_PATH = (
+    "If shallow structure is a sequence, input must also be a sequence. "
+    "Input at path: {path} has type: {input_type}.")
+
 K = TypeVar("K")
 V = TypeVar("V")
 
@@ -520,7 +524,10 @@ def _multiyield_flat_up_to(shallow_tree, *input_trees):
                      f"yielded was {paths[0]}.") from e
 
 
-def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
+def _assert_shallow_structure(shallow_tree,
+                              input_tree,
+                              path=None,
+                              check_types=True):
   """Asserts that `shallow_tree` is a shallow structure of `input_tree`.
 
   That is, this function recursively tests if each key in shallow_tree has its
@@ -556,6 +563,8 @@ def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
   Args:
     shallow_tree: an arbitrarily nested structure.
     input_tree: an arbitrarily nested structure.
+    path: if not `None`, a tuple containing the current path in the nested
+      structure. This is only used for more informative errror messages.
     check_types: if `True` (default) the sequence types of `shallow_tree` and
       `input_tree` have to be the same.
 
@@ -568,8 +577,14 @@ def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
   """
   if is_nested(shallow_tree):
     if not is_nested(input_tree):
-      raise TypeError(_IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ.format(
-          type(input_tree)))
+      if path is not None:
+        raise TypeError(
+            _IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ_WITH_PATH.format(
+                path=list(path), input_type=type(input_tree)))
+      else:
+        raise TypeError(
+            _IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ.format(
+                type(input_tree)))
 
     if isinstance(shallow_tree, ObjectProxy):
       shallow_type = type(shallow_tree.__wrapped__)
@@ -618,7 +633,10 @@ def _assert_shallow_structure(shallow_tree, input_tree, check_types=True):
     for shallow_key, shallow_branch in shallow_iter:
       input_branch = get_matching_input_branch(shallow_key)
       _assert_shallow_structure(
-          shallow_branch, input_branch, check_types=check_types)
+          shallow_branch,
+          input_branch,
+          path + (shallow_key,) if path is not None else None,
+          check_types=check_types)
 
 
 def flatten_up_to(shallow_structure, input_structure, check_types=True):
@@ -658,7 +676,7 @@ def flatten_up_to(shallow_structure, input_structure, check_types=True):
       `input_structure` differ in the types of their components.
   """
   _assert_shallow_structure(
-      shallow_structure, input_structure, check_types=check_types)
+      shallow_structure, input_structure, path=None, check_types=check_types)
   # Discard paths returned by _yield_flat_up_to.
   return [v for _, v in _yield_flat_up_to(shallow_structure, input_structure)]
 
@@ -691,7 +709,7 @@ def flatten_with_path_up_to(shallow_structure,
       `input_structure` differ in the types of their components.
   """
   _assert_shallow_structure(
-      shallow_structure, input_structure, check_types=check_types)
+      shallow_structure, input_structure, path=(), check_types=check_types)
   return list(_yield_flat_up_to(shallow_structure, input_structure))
 
 

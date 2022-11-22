@@ -854,7 +854,8 @@ class NestTest(parameterized.TestCase):
     shallow_tree = ["shallow_tree"]
     with self.assertRaisesWithLiteralMatch(
         TypeError,
-        tree._IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ.format(type(input_tree))):
+        tree._IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ_WITH_PATH.format(
+            path=[], input_type=type(input_tree))):
       (flattened_input_tree_paths,
        flattened_input_tree) = get_paths_and_values(shallow_tree, input_tree)
     (flattened_shallow_tree_paths,
@@ -866,7 +867,8 @@ class NestTest(parameterized.TestCase):
     shallow_tree = ["shallow_tree_9", "shallow_tree_8"]
     with self.assertRaisesWithLiteralMatch(
         TypeError,
-        tree._IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ.format(type(input_tree))):
+        tree._IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ_WITH_PATH.format(
+            path=[], input_type=type(input_tree))):
       (flattened_input_tree_paths,
        flattened_input_tree) = get_paths_and_values(shallow_tree, input_tree)
     (flattened_shallow_tree_paths,
@@ -879,7 +881,8 @@ class NestTest(parameterized.TestCase):
     shallow_tree = [9]
     with self.assertRaisesWithLiteralMatch(
         TypeError,
-        tree._IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ.format(type(input_tree))):
+        tree._IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ_WITH_PATH.format(
+            path=[], input_type=type(input_tree))):
       (flattened_input_tree_paths,
        flattened_input_tree) = get_paths_and_values(shallow_tree, input_tree)
     (flattened_shallow_tree_paths,
@@ -891,13 +894,28 @@ class NestTest(parameterized.TestCase):
     shallow_tree = [9, 8]
     with self.assertRaisesWithLiteralMatch(
         TypeError,
-        tree._IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ.format(type(input_tree))):
+        tree._IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ_WITH_PATH.format(
+            path=[], input_type=type(input_tree))):
       (flattened_input_tree_paths,
        flattened_input_tree) = get_paths_and_values(shallow_tree, input_tree)
     (flattened_shallow_tree_paths,
      flattened_shallow_tree) = get_paths_and_values(shallow_tree, shallow_tree)
     self.assertEqual(flattened_shallow_tree_paths, [(0,), (1,)])
     self.assertEqual(flattened_shallow_tree, shallow_tree)
+
+    # Test that error messages include paths.
+    input_tree = {"a": {"b": {0, 1}}}
+    structure = {"a": {"b": [0, 1]}}
+    with self.assertRaisesWithLiteralMatch(
+        TypeError,
+        tree._IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ_WITH_PATH.format(
+            path=["a", "b"], input_type=type(input_tree["a"]["b"]))):
+      (flattened_input_tree_paths,
+       flattened_input_tree) = get_paths_and_values(structure, input_tree)
+    (flattened_tree_paths,
+     flattened_tree) = get_paths_and_values(structure, structure)
+    self.assertEqual(flattened_tree_paths, [("a", "b", 0,), ("a", "b", 1,)])
+    self.assertEqual(flattened_tree, structure["a"]["b"])
 
   def testMapStructureUpTo(self):
     # Named tuples.
