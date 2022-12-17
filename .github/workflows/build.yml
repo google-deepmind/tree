@@ -32,7 +32,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
-        python_tag: [cp36, cp37, cp38, cp39, cp310, cp311]
+        python_tag: [cp37, cp38, cp39, cp310, cp311]
         include:
           - os: windows-latest
             os_tag: win_amd64
@@ -62,8 +62,8 @@ jobs:
         env:
           CIBW_BUILD: ${{ matrix.python_tag }}-${{ matrix.os_tag }}
           CIBW_BUILD_VERBOSITY: 3
-          CIBW_PROJECT_REQUIRES_PYTHON: ">=3.6"
-          CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux2010_x86_64
+          CIBW_PROJECT_REQUIRES_PYTHON: ">=3.7"
+          CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux2014_x86_64
           CIBW_TEST_REQUIRES: pytest
           CIBW_BEFORE_TEST: pip install -r requirements-test.txt
           CIBW_TEST_COMMAND: pytest --pyargs tree
