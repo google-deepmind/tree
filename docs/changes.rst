@@ -2,12 +2,20 @@
 Changelog
 #########
 
+Version 0.1.8
+=============
+
+Released 2022-12-19
+
+* Bumped pybind11 to v2.10.1 to support Python 3.11.
+* Dropped support for Python 3.6.
+
 Version 0.1.7
 =============
 
 Released 2022-04-10
 
-* The build is now done via CMake instead of Bazel
+* The build is now done via CMake instead of Bazel.
 
 Version 0.1.6
 =============
@@ -61,4 +69,3 @@ Version 0.1.0
 Released 2019-11-05
 
 * Initial public release.
-
