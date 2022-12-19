@@ -121,3 +121,59 @@ jobs:
         with:
           name: dm-tree-${{ github.workflow }}-${{ github.run_number }}
           path: wheelhouse/dm_tree*.whl
+
+  wheel-aarch:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python_tag: [cp36, cp37, cp38, cp39, cp310]
+        arch: [aarch64, ppc64le, s390x, i686]
+        include:
+          - arch: aarch64
+            arch_tag: manylinux_aarch64
+          - arch: ppc64le
+            arch_tag: manylinux_ppc64le
+          - arch: s390x
+            arch_tag: manylinux_s390x
+          - arch: i686
+            arch_tag: manylinux_i686
+
+    name: "wheel: ${{ matrix.python_tag }}-${{ matrix.arch }}"
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: all
+      - name: Install prerequisites
+        run: |
+          set -xe
+          pwd
+          python --version
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install cibuildwheel
+        shell: bash
+
+      - name: Build and test
+        run: set -xe && python -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_BUILD: ${{ matrix.python_tag }}-${{ matrix.arch_tag }}
+          CIBW_BUILD_VERBOSITY: 3
+          CIBW_TEST_REQUIRES: pytest
+          CIBW_BEFORE_TEST: pip install -r requirements-test.txt
+          CIBW_TEST_COMMAND: pytest --pyargs tree
+          CIBW_ARCHS_LINUX: ${{ matrix.arch }}
+        shell: bash
+
+      - name: Directory listing
+        run: ls -lh wheelhouse/dm_tree*.whl
+        shell: bash
+
+      - uses: actions/upload-artifact@v2
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
+        with:
+          name: dm-tree-${{ github.workflow }}-${{ github.run_number }}
+          path: wheelhouse/dm_tree*.whl
