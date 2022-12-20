@@ -14,8 +14,10 @@ jobs:
     name: sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
       - name: Create sdist
         run: python setup.py sdist
         shell: bash
@@ -40,13 +42,25 @@ jobs:
             os_tag: manylinux_x86_64
           - os: macos-latest
             os_tag: macosx_x86_64
+          - python_tag: cp37
+            python_version: '3.7'
+          - python_tag: cp38
+            python_version: '3.8'
+          - python_tag: cp39
+            python_version: '3.9'
+          - python_tag: cp310
+            python_version: "3.10"
+          - python_tag: cp311
+            python_version: "3.11"
 
     name: "wheel: ${{ matrix.python_tag }}-${{ matrix.os_tag }}"
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python_version }}
 
       - name: Install prerequisites
         run: |
@@ -84,13 +98,24 @@ jobs:
       matrix:
         python_tag: [cp38, cp39, cp310, cp311]
         macos_arch: [arm64, universal2]
+        include:
+          - python_tag: cp38
+            python_version: '3.8'
+          - python_tag: cp39
+            python_version: '3.9'
+          - python_tag: cp310
+            python_version: "3.10"
+          - python_tag: cp311
+            python_version: "3.11"
 
     name: "wheel: ${{ matrix.python_tag }}-macosx_${{ matrix.macos_arch }}"
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python_version }}
 
       - name: Install prerequisites
         run: |
@@ -126,7 +151,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python_tag: [cp36, cp37, cp38, cp39, cp310]
+        python_tag: [cp37, cp38, cp39, cp310, cp311]
         arch: [aarch64, s390x, i686]
         include:
           - arch: aarch64
@@ -135,13 +160,25 @@ jobs:
             arch_tag: manylinux_s390x
           - arch: i686
             arch_tag: manylinux_i686
+          - python_tag: cp37
+            python_version: '3.7'
+          - python_tag: cp38
+            python_version: '3.8'
+          - python_tag: cp39
+            python_version: '3.9'
+          - python_tag: cp310
+            python_version: "3.10"
+          - python_tag: cp311
+            python_version: "3.11"
 
     name: "wheel: ${{ matrix.python_tag }}-${{ matrix.arch }}"
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python_version }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
         with:
