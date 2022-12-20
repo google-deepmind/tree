@@ -127,12 +127,10 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python_tag: [cp36, cp37, cp38, cp39, cp310]
-        arch: [aarch64, ppc64le, s390x, i686]
+        arch: [aarch64, s390x, i686]
         include:
           - arch: aarch64
             arch_tag: manylinux_aarch64
-          - arch: ppc64le
-            arch_tag: manylinux_ppc64le
           - arch: s390x
             arch_tag: manylinux_s390x
           - arch: i686
