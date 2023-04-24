@@ -18,7 +18,7 @@
 from collections import abc as collections_abc
 import logging
 import sys
-from typing import Mapping, Sequence, Text, TypeVar, Union
+from typing import Mapping, Sequence, TypeVar, Union
 
 from .sequence import _is_attrs
 from .sequence import _is_namedtuple
@@ -95,22 +95,15 @@ _IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ_WITH_PATH = (
 K = TypeVar("K")
 V = TypeVar("V")
 
-# A generic monomorphic structure type, e.g. ``StructureKV[Text, int]``
-# is an arbitrarily nested structure where keys must be of type ``Text``
+# A generic monomorphic structure type, e.g. ``StructureKV[str, int]``
+# is an arbitrarily nested structure where keys must be of type ``str``
 # and values are integers.
 StructureKV = Union[
     Sequence["StructureKV[K, V]"],
     Mapping[K, "StructureKV[K, V]"],
     V,
 ]
-
-# A specialization of ``StructureKV`` for the common case of ``Text`` keys.
-try:
-  Structure = StructureKV[Text, V]
-except TypeError:
-  # Older Python 3.5 and 3.6 releases do not always support such use
-  # of generics. Specialize ``StructureKV`` manually.
-  Structure = Union[Sequence["Structure[V]"], Mapping[Text, "Structure[V]"], V]
+Structure = StructureKV[str, V]
 
 
 def _get_attrs_items(obj):
