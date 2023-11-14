@@ -32,7 +32,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
-        python_tag: [cp37, cp38, cp39, cp310, cp311]
+        python_tag: [cp37, cp38, cp39, cp310, cp311, cp312]
         include:
           - os: windows-latest
             os_tag: win_amd64
@@ -82,7 +82,7 @@ jobs:
   wheel-apple_silicon:
     strategy:
       matrix:
-        python_tag: [cp38, cp39, cp310, cp311]
+        python_tag: [cp38, cp39, cp310, cp311, cp312]
         macos_arch: [arm64, universal2]
 
     name: "wheel: ${{ matrix.python_tag }}-macosx_${{ matrix.macos_arch }}"
@@ -126,7 +126,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python_tag: [cp36, cp37, cp38, cp39, cp310]
+        python_tag: [cp36, cp37, cp38, cp39, cp310, cp311, cp312]
         arch: [aarch64, ppc64le, s390x, i686]
         include:
           - arch: aarch64
