@@ -17,7 +17,9 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
       - name: Create sdist
-        run: python setup.py sdist
+        run: |
+          python -m pip install --upgrade pip setuptools
+          python setup.py sdist
         shell: bash
       - name: Directory listing
         run: ls -lh dist/dm-tree*.tar.gz
@@ -32,7 +34,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
-        python_tag: [cp37, cp38, cp39, cp310, cp311, cp312]
+        python_tag: [cp38, cp39, cp310, cp311, cp312]
         include:
           - os: windows-latest
             os_tag: win_amd64
@@ -126,7 +128,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python_tag: [cp36, cp37, cp38, cp39, cp310, cp311, cp312]
+        python_tag: [cp38, cp39, cp310, cp311, cp312]
         arch: [aarch64, ppc64le, s390x, i686]
         include:
           - arch: aarch64
