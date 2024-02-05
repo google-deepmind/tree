@@ -140,6 +140,7 @@ jobs:
           - arch: i686
             arch_tag: manylinux_i686
 
+    if: false
     name: "wheel: ${{ matrix.python_tag }}-${{ matrix.arch }}"
     runs-on: ${{ matrix.os }}
 
