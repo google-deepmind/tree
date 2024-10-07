@@ -85,6 +85,8 @@ class BuildCMakeExtension(build_ext.build_ext):
   def build_extension(self, ext):
     extension_dir = os.path.abspath(
         os.path.dirname(self.get_ext_fullpath(ext.name)))
+    tree_dir = os.path.join(extension_dir, 'tree')  # pylint:disable=unreachable
+    os.makedirs(tree_dir, exist_ok=True)
     build_cfg = 'Debug' if self.debug else 'Release'
     cmake_args = [
         f'-DPython3_ROOT_DIR={sys.prefix}',
@@ -113,7 +115,6 @@ class BuildCMakeExtension(build_ext.build_ext):
 
     # Force output to <extension_dir>/. Amends CMake multigenerator output paths
     # on Windows and avoids Debug/ and Release/ subdirs, which is CMake default.
-    tree_dir = os.path.join(extension_dir, 'tree')  # pylint:disable=unreachable
     for cfg in ('Release', 'Debug'):
       cfg_dir = os.path.join(extension_dir, cfg)
       if os.path.isdir(cfg_dir):
@@ -143,11 +144,10 @@ setuptools.setup(
         'Intended Audience :: Developers',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
+        'Programming Language :: Python :: 3.13',
         'Topic :: Scientific/Engineering :: Mathematics',
         'Topic :: Software Development :: Libraries',
     ],
