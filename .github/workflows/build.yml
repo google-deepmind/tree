@@ -24,7 +24,7 @@ jobs:
       - name: Directory listing
         run: ls -lh dist/dm-tree*.tar.gz
         shell: bash
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
         with:
           name: dm-tree-${{ github.workflow }}-${{ github.run_number }}
@@ -75,7 +75,7 @@ jobs:
         run: ls -lh wheelhouse/dm_tree*.whl
         shell: bash
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
         with:
           name: dm-tree-${{ github.workflow }}-${{ github.run_number }}
@@ -118,7 +118,7 @@ jobs:
         run: ls -lh wheelhouse/dm_tree*.whl
         shell: bash
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
         with:
           name: dm-tree-${{ github.workflow }}-${{ github.run_number }}
@@ -175,7 +175,7 @@ jobs:
         run: ls -lh wheelhouse/dm_tree*.whl
         shell: bash
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
         with:
           name: dm-tree-${{ github.workflow }}-${{ github.run_number }}
