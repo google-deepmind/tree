@@ -40,14 +40,6 @@ def _get_tree_version():
       return ns['__version__']
 
 
-def _parse_requirements(path):
-  with open(os.path.join(here, path)) as f:
-    return [
-        line.rstrip() for line in f
-        if not (line.isspace() or line.startswith('#'))
-    ]
-
-
 class CMakeExtension(setuptools.Extension):
   """An extension with no sources.
 
@@ -106,10 +98,13 @@ class BuildCMakeExtension(build_ext.build_ext):
       cmake_args.append(f'-DCMAKE_OSX_ARCHITECTURES={";".join(osx_archs)}')
     os.makedirs(self.build_temp, exist_ok=True)
     subprocess.check_call(
-        ['cmake', ext.source_dir] + cmake_args, cwd=self.build_temp)
-    subprocess.check_call(
-        ['cmake', '--build', '.', f'-j{os.cpu_count()}', '--config', build_cfg],
-        cwd=self.build_temp)
+        ['cmake', '-S', ext.source_dir, '-B', self.build_temp] + cmake_args)
+    num_jobs = ()
+    if self.parallel:
+      num_jobs = (f'-j{self.parallel}',)
+    subprocess.check_call([
+        'cmake', '--build', self.build_temp, *num_jobs, '--config', build_cfg
+    ])
 
     # Force output to <extension_dir>/. Amends CMake multigenerator output paths
     # on Windows and avoids Debug/ and Release/ subdirs, which is CMake default.
@@ -132,7 +127,16 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     # Contained modules and scripts.
     packages=setuptools.find_packages(),
-    tests_require=_parse_requirements('requirements-test.txt'),
+    install_requires=[
+        'absl-py>=0.6.1',
+        'attrs>=18.2.0',
+        'numpy>=1.21',
+        "numpy>=1.21.2; python_version>='3.10'",
+        "numpy>=1.23.3; python_version>='3.11'",
+        "numpy>=1.26.0; python_version>='3.12'",
+        "numpy>=2.1.0; python_version>='3.13'",
+        'wrapt>=1.11.2',
+    ],
     test_suite='tree',
     cmdclass=dict(build_ext=BuildCMakeExtension),
     ext_modules=[CMakeExtension('_tree', source_dir='tree')],
