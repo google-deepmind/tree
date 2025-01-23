@@ -12,171 +12,62 @@ on:
 jobs:
   sdist:
     name: sdist
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+        with:
+          python-version: '3.11'
       - name: Create sdist
         run: |
           python -m pip install --upgrade pip setuptools
           python setup.py sdist
         shell: bash
-      - name: Directory listing
-        run: ls -lh dist/dm-tree*.tar.gz
+      - name: List output directory
+        run: ls -lh dist/dm_tree*.tar.gz
         shell: bash
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08  # v4.6.0
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
         with:
-          name: dm-tree-${{ github.workflow }}-${{ github.run_number }}
-          path: dist/dm-tree*.tar.gz
+          name: dm-tree-sdist
+          path: dist/dm_tree*.tar.gz
 
-  wheel-x86_64:
-    strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-        python_tag: [cp38, cp39, cp310, cp311, cp312]
-        include:
-          - os: windows-latest
-            os_tag: win_amd64
-          - os: ubuntu-latest
-            os_tag: manylinux_x86_64
-          - os: macos-latest
-            os_tag: macosx_x86_64
-
-    name: "wheel: ${{ matrix.python_tag }}-${{ matrix.os_tag }}"
+  bdist-wheel:
+    name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-
-      - name: Install prerequisites
-        run: |
-          set -xe
-          pwd
-          python --version
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install cibuildwheel
-        shell: bash
-
-      - name: Build and test
-        run: set -xe && python -m cibuildwheel --output-dir wheelhouse
-        env:
-          CIBW_BUILD: ${{ matrix.python_tag }}-${{ matrix.os_tag }}
-          CIBW_BUILD_VERBOSITY: 3
-          CIBW_PROJECT_REQUIRES_PYTHON: ">=3.7"
-          CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux2014_x86_64
-          CIBW_TEST_REQUIRES: pytest
-          CIBW_BEFORE_TEST: pip install -r requirements-test.txt
-          CIBW_TEST_COMMAND: pytest --pyargs tree
-        shell: bash
-
-      - name: Directory listing
-        run: ls -lh wheelhouse/dm_tree*.whl
-        shell: bash
-
-      - uses: actions/upload-artifact@v2
-        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
-        with:
-          name: dm-tree-${{ github.workflow }}-${{ github.run_number }}
-          path: wheelhouse/dm_tree*.whl
-
-  wheel-apple_silicon:
     strategy:
       matrix:
-        python_tag: [cp38, cp39, cp310, cp311, cp312]
-        macos_arch: [arm64, universal2]
-
-    name: "wheel: ${{ matrix.python_tag }}-macosx_${{ matrix.macos_arch }}"
-    runs-on: macos-latest
+        os: [ubuntu-24.04, macos-14, windows-2022]  # latest
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-
-      - name: Install prerequisites
-        run: |
-          set -xe
-          pwd
-          python --version
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install cibuildwheel
-        shell: bash
-
-      - name: Build and test
-        run: set -xe && python -m cibuildwheel --output-dir wheelhouse
-        env:
-          CIBW_BUILD: ${{ matrix.python_tag }}-macosx_${{ matrix.macos_arch }}
-          CIBW_BUILD_VERBOSITY: 3
-          CIBW_ARCHS_MACOS: ${{ matrix.macos_arch }}
-          CIBW_TEST_REQUIRES: pytest
-          CIBW_BEFORE_TEST: pip install -r requirements-test.txt
-          CIBW_TEST_COMMAND: "if [ \"${CIBW_ARCHS_MACOS}\" = \"universal2\" ]; then pytest --pyargs tree; fi"
-        shell: bash
-
-      - name: Directory listing
-        run: ls -lh wheelhouse/dm_tree*.whl
-        shell: bash
-
-      - uses: actions/upload-artifact@v2
-        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
-          name: dm-tree-${{ github.workflow }}-${{ github.run_number }}
-          path: wheelhouse/dm_tree*.whl
-
-  wheel-aarch:
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        python_tag: [cp38, cp39, cp310, cp311, cp312]
-        arch: [aarch64, ppc64le, s390x, i686]
-        include:
-          - arch: aarch64
-            arch_tag: manylinux_aarch64
-          - arch: ppc64le
-            arch_tag: manylinux_ppc64le
-          - arch: s390x
-            arch_tag: manylinux_s390x
-          - arch: i686
-            arch_tag: manylinux_i686
-
-    if: false
-    name: "wheel: ${{ matrix.python_tag }}-${{ matrix.arch }}"
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+          submodules: true
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+        with:
+          python-version: "3.11"
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        if: runner.os == 'Linux'
+        uses: docker/setup-qemu-action@53851d14592bedcffcf25ea515637cff71ef929a  # v3.3.0
         with:
           platforms: all
-      - name: Install prerequisites
-        run: |
-          set -xe
-          pwd
-          python --version
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install cibuildwheel
-        shell: bash
-
-      - name: Build and test
-        run: set -xe && python -m cibuildwheel --output-dir wheelhouse
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel==2.22.0
+      - name: Build wheels
+        run: python -m cibuildwheel --output-dir wheelhouse
         env:
-          CIBW_BUILD: ${{ matrix.python_tag }}-${{ matrix.arch_tag }}
-          CIBW_BUILD_VERBOSITY: 3
-          CIBW_TEST_REQUIRES: pytest
-          CIBW_BEFORE_TEST: pip install -r requirements-test.txt
+          CIBW_ARCHS_LINUX: auto aarch64
+          CIBW_ARCHS_MACOS: universal2
+          CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp313t-*"
+          CIBW_BUILD_VERBOSITY: 1
+          CIBW_FREE_THREADED_SUPPORT: True
+          CIBW_PRERELEASE_PYTHONS: True
+          CIBW_SKIP: "*musllinux* *i686* *win32* *t-win*"
           CIBW_TEST_COMMAND: pytest --pyargs tree
-          CIBW_ARCHS_LINUX: ${{ matrix.arch }}
-        shell: bash
-
-      - name: Directory listing
-        run: ls -lh wheelhouse/dm_tree*.whl
-        shell: bash
-
-      - uses: actions/upload-artifact@v2
+          CIBW_TEST_REQUIRES: pytest
+          MAKEFLAGS: "-j$(nproc)"
+      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08  # v4.6.0
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
         with:
-          name: dm-tree-${{ github.workflow }}-${{ github.run_number }}
-          path: wheelhouse/dm_tree*.whl
+          name: dm-tree-bdist-wheel-${{ matrix.os }}-${{ strategy.job-index }}
+          path: wheelhouse/*.whl

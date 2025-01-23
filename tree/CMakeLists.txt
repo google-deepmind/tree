@@ -1,7 +1,14 @@
-# Version >= 3.12 required for new FindPython module
-# https://cmake.org/cmake/help/v3.12/release/3.12.html
-cmake_minimum_required (VERSION 3.12)
+# Version >= 3.24 required for new `FindPython` module and `FIND_PACKAGE_ARGS`
+# keyword of `FetchContent` module.
+# https://cmake.org/cmake/help/v3.24/release/3.24.html
+cmake_minimum_required(VERSION 3.24)
+
+cmake_policy(SET CMP0135 NEW)
+
 project (tree LANGUAGES CXX)
+
+option(USE_SYSTEM_ABSEIL "Force use of system abseil-cpp" OFF)
+option(USE_SYSTEM_PYBIND11 "Force use of system pybind11" OFF)
 
 # Required for Python.h and python binding.
 find_package(Python3 COMPONENTS Interpreter Development)
@@ -50,79 +57,69 @@ if(APPLE)
   set (CMAKE_FIND_FRAMEWORK LAST)
 endif()
 
-set(PYBIND_VER 2.10.1)
-find_package(pybind11 ${PYBIND_VER} CONFIG)
+# Use `FetchContent` module to manage all external dependencies (i.e.
+# abseil-cpp and pybind11).
+include(FetchContent)
 
-if (NOT pybind11_FOUND)
-  # Fetch pybind to be able to use pybind11_add_module symbol.
-  include(FetchContent)
-  FetchContent_Declare(
-    pybind11
-    GIT_REPOSITORY https://github.com/pybind/pybind11
-    GIT_TAG        v${PYBIND_VER}
-  )
-  if(NOT pybind11_POPULATED)
-      FetchContent_Populate(pybind11)
-      add_subdirectory(${pybind11_SOURCE_DIR} ${pybind11_BINARY_DIR})
-      include_directories(${pybind11_INCLUDE_DIR})
-  endif()
+# Needed to disable Abseil tests.
+set(BUILD_TESTING OFF)
+
+# Try to find abseil-cpp package system-wide first.
+if (USE_SYSTEM_ABSEIL)
+    message(STATUS "Use system abseil-cpp: ${USE_SYSTEM_ABSEIL}")
+    set(ABSEIL_FIND_PACKAGE_ARGS FIND_PACKAGE_ARGS)
 endif()
+
+# Include abseil-cpp.
+set(ABSEIL_REPO https://github.com/abseil/abseil-cpp)
+set(ABSEIL_CMAKE_ARGS
+  "-DCMAKE_INSTALL_PREFIX=${CMAKE_SOURCE_DIR}/abseil-cpp"
+  "-DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}"
+  "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+  "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}"
+  "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+  "-DCMAKE_POSITION_INDEPENDENT_CODE=${CMAKE_POSITION_INDEPENDENT_CODE}"
+  "-DLIBRARY_OUTPUT_PATH=${CMAKE_SOURCE_DIR}/abseil-cpp/lib"
+  "-DABSL_PROPAGATE_CXX_STD=ON")
+if(DEFINED CMAKE_OSX_ARCHITECTURES)
+  set(ABSEIL_CMAKE_ARGS
+      ${ABSEIL_CMAKE_ARGS}
+      "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}")
+endif()
+
+FetchContent_Declare(
+  absl
+  URL         ${ABSEIL_REPO}/archive/refs/tags/20220623.2.tar.gz
+  URL_HASH    SHA256=773652c0fc276bcd5c461668dc112d0e3b6cde499600bfe3499c5fdda4ed4a5b
+  CMAKE_ARGS  ${ABSEIL_CMAKE_ARGS}
+  EXCLUDE_FROM_ALL
+  ${ABSEIL_FIND_PACKAGE_ARGS})
+
+# Try to find pybind11 package system-wide first.
+if (USE_SYSTEM_PYBIND11)
+    message(STATUS "Use system pybind11: ${USE_SYSTEM_PYBIND11}")
+    set(PYBIND11_FIND_PACKAGE_ARGS FIND_PACKAGE_ARGS)
+endif()
+
+FetchContent_Declare(
+  pybind11
+  URL       https://github.com/pybind/pybind11/archive/refs/tags/v2.10.1.tar.gz
+  URL_HASH  SHA256=111014b516b625083bef701df7880f78c2243835abdb263065b6b59b960b6bad
+  ${PYBIND11_FIND_PACKAGE_ARGS})
+
+FetchContent_MakeAvailable(absl pybind11)
 
 # Define pybind11 tree module.
 pybind11_add_module(_tree tree.h tree.cc)
 
-find_package(absl)
-
-if (NOT absl_FOUND)
-  # Needed to disable Abseil tests.
-  set (BUILD_TESTING OFF)
-
-  # Include abseil-cpp.
-  set(ABSEIL_VER 20210324.2)
-  include(ExternalProject)
-  set(ABSEIL_CMAKE_ARGS
-      "-DCMAKE_INSTALL_PREFIX=${CMAKE_SOURCE_DIR}/abseil-cpp"
-      "-DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}"
-      "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
-      "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}"
-      "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
-      "-DCMAKE_POSITION_INDEPENDENT_CODE=${CMAKE_POSITION_INDEPENDENT_CODE}"
-      "-DLIBRARY_OUTPUT_PATH=${CMAKE_SOURCE_DIR}/abseil-cpp/lib")
-  if(DEFINED CMAKE_OSX_ARCHITECTURES)
-      set(ABSEIL_CMAKE_ARGS
-          ${ABSEIL_CMAKE_ARGS}
-          "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}")
-  endif()
-  ExternalProject_Add(abseil-cpp
-    GIT_REPOSITORY    https://github.com/abseil/abseil-cpp.git
-    GIT_TAG           ${ABSEIL_VER}
-    PREFIX            ${CMAKE_SOURCE_DIR}/abseil-cpp
-    CMAKE_ARGS        ${ABSEIL_CMAKE_ARGS}
-  )
-  ExternalProject_Get_Property(abseil-cpp install_dir)
-  set(abseil_install_dir ${install_dir})
-  include_directories (${abseil_install_dir}/include)
-
-  add_dependencies(_tree abseil-cpp)
-
-  if (WIN32 OR MSVC)
-      set(ABSEIL_LIB_PREF "absl")
-      set(LIB_SUFF "lib")
-  else()
-      set(ABSEIL_LIB_PREF "libabsl")
-      set(LIB_SUFF "a")
-  endif()
-
-  # Link abseil static libs.
-  # We don't use find_library here to force cmake to build abseil before linking.
-  set(ABSEIL_LIBS int128 raw_hash_set raw_logging_internal strings throw_delegate)
-  foreach(ABSEIL_LIB IN LISTS ABSEIL_LIBS)
-    target_link_libraries(_tree PRIVATE
-        "${abseil_install_dir}/lib/${ABSEIL_LIB_PREF}_${ABSEIL_LIB}.${LIB_SUFF}")
-  endforeach()
-else()
-  target_link_libraries(_tree PRIVATE absl::int128 absl::raw_hash_set absl::raw_logging_internal absl::strings absl::throw_delegate)
-endif()
+target_link_libraries(
+  _tree
+  PRIVATE
+    absl::int128
+    absl::raw_hash_set
+    absl::raw_logging_internal
+    absl::strings
+    absl::throw_delegate)
 
 # Make the module private to tree package.
 set_target_properties(_tree PROPERTIES OUTPUT_NAME tree/_tree)
