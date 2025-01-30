@@ -2,6 +2,13 @@
 Changelog
 #########
 
+Version 0.1.9
+=============
+
+Released 2025-01-30
+
+* Dropped support for Python <3.10.
+
 Version 0.1.8
 =============
 

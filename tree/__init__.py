@@ -59,7 +59,7 @@ __all__ = [
     "MAP_TO_NONE",
 ]
 
-__version__ = "0.1.8"
+__version__ = "0.1.9"
 
 # Note: this is *not* the same as `six.string_types`, which in Python3 is just
 #       `(str,)` (i.e. it does not include byte strings).

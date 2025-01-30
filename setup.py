@@ -127,6 +127,7 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     # Contained modules and scripts.
     packages=setuptools.find_packages(),
+    python_requires='>=3.10',
     install_requires=[
         'absl-py>=0.6.1',
         'attrs>=18.2.0',
@@ -147,11 +148,10 @@ setuptools.setup(
         'Intended Audience :: Developers',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
+        'Programming Language :: Python :: 3.13',
         'Topic :: Scientific/Engineering :: Mathematics',
         'Topic :: Software Development :: Libraries',
     ],
