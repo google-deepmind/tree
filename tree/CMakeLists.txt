@@ -89,8 +89,8 @@ endif()
 
 FetchContent_Declare(
   absl
-  URL         ${ABSEIL_REPO}/archive/refs/tags/20220623.2.tar.gz
-  URL_HASH    SHA256=773652c0fc276bcd5c461668dc112d0e3b6cde499600bfe3499c5fdda4ed4a5b
+  URL         ${ABSEIL_REPO}/archive/refs/tags/20250127.1.tar.gz
+  URL_HASH    SHA256=b396401fd29e2e679cace77867481d388c807671dc2acc602a0259eeb79b7811
   CMAKE_ARGS  ${ABSEIL_CMAKE_ARGS}
   EXCLUDE_FROM_ALL
   ${ABSEIL_FIND_PACKAGE_ARGS})
@@ -103,8 +103,8 @@ endif()
 
 FetchContent_Declare(
   pybind11
-  URL       https://github.com/pybind/pybind11/archive/refs/tags/v2.10.1.tar.gz
-  URL_HASH  SHA256=111014b516b625083bef701df7880f78c2243835abdb263065b6b59b960b6bad
+  URL       https://github.com/pybind/pybind11/archive/refs/tags/v2.13.6.tar.gz
+  URL_HASH  SHA256=e08cb87f4773da97fa7b5f035de8763abc656d87d5773e62f6da0587d1f0ec20
   ${PYBIND11_FIND_PACKAGE_ARGS})
 
 FetchContent_MakeAvailable(absl pybind11)
