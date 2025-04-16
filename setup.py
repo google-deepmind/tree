@@ -83,6 +83,9 @@ class BuildCMakeExtension(build_ext.build_ext):
         f'-DPython3_EXECUTABLE={sys.executable}',
         f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extension_dir}',
         f'-DCMAKE_BUILD_TYPE={build_cfg}'
+        # Add options to use distros libraries
+        f'-DUSE_SYSTEM_ABSEIL={"ON" if os.environ.get("USE_SYSTEM_ABSEIL") else "OFF"}',
+        f'-DUSE_SYSTEM_PYBIND11={"ON" if os.environ.get("USE_SYSTEM_PYBIND11") else "OFF"}'
     ]
     if platform.system() != 'Windows':
       cmake_args.extend([
