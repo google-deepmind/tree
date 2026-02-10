@@ -122,6 +122,10 @@ target_link_libraries(
     absl::throw_delegate)
 
 # Make the module private to tree package.
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tree)
 set_target_properties(_tree PROPERTIES OUTPUT_NAME tree/_tree)
 
-
+# Install the Python extension module
+set(PYTHON_INSTALL_DIR "${Python3_SITEARCH}/tree" CACHE PATH "Installation directory for Python tree package")
+install(TARGETS _tree LIBRARY DESTINATION ${PYTHON_INSTALL_DIR})
+install(FILES __init__.py sequence.py DESTINATION ${PYTHON_INSTALL_DIR})
