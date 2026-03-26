@@ -15,12 +15,13 @@ limitations under the License.
 #include "tree.h"
 
 #include <functional>
+#include <atomic>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 
 // logging
-#include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include <pybind11/pybind11.h>
@@ -50,7 +51,7 @@ using PyObjectPtr = std::unique_ptr<PyObject, DecrementsPyRefcount>;
 
 const int kMaxItemsInCache = 1024;
 
-bool WarnedThatSetIsNotSequence = false;
+std::atomic<bool> WarnedThatSetIsNotSequence{false};
 
 bool IsString(PyObject* o) {
   return PyBytes_Check(o) || PyByteArray_Check(o) || PyUnicode_Check(o);
@@ -114,6 +115,7 @@ class CachedTypeCheck {
     auto* type = Py_TYPE(o);
 
     {
+      std::lock_guard<std::mutex> lock(mutex_);
       auto it = type_to_sequence_map_.find(type);
       if (it != type_to_sequence_map_.end()) {
         return it->second;
@@ -133,6 +135,7 @@ class CachedTypeCheck {
     // that are eligible for decref. As a precaution, we limit the size of the
     // map to 1024.
     {
+      std::lock_guard<std::mutex> lock(mutex_);
       if (type_to_sequence_map_.size() < kMaxItemsInCache) {
         Py_INCREF(type);
         type_to_sequence_map_.insert({type, check_result});
@@ -145,29 +148,30 @@ class CachedTypeCheck {
  private:
   std::function<int(PyObject*)> ternary_predicate_;
   std::unordered_map<PyTypeObject*, bool> type_to_sequence_map_;
+  mutable std::mutex mutex_;
 };
 
 py::object GetCollectionsSequenceType() {
   static py::object type =
-      py::module::import("collections.abc").attr("Sequence");
+      py::module_::import("collections.abc").attr("Sequence");
   return type;
 }
 
 py::object GetCollectionsMappingType() {
   static py::object type =
-      py::module::import("collections.abc").attr("Mapping");
+      py::module_::import("collections.abc").attr("Mapping");
   return type;
 }
 
 py::object GetCollectionsMappingViewType() {
   static py::object type =
-      py::module::import("collections.abc").attr("MappingView");
+      py::module_::import("collections.abc").attr("MappingView");
   return type;
 }
 
 py::object GetWraptObjectProxyTypeUncached() {
   try {
-    return py::module::import("wrapt").attr("ObjectProxy");
+    return py::module_::import("wrapt").attr("ObjectProxy");
   } catch (const py::error_already_set& e) {
     if (e.matches(PyExc_ImportError)) return py::none();
     throw e;
@@ -722,13 +726,13 @@ void AssertSameStructure(PyObject* o1, PyObject* o2, bool check_types) {
 
 ValueIteratorPtr GetValueIterator(PyObject* nested) {
   if (PyDict_Check(nested)) {
-    return absl::make_unique<DictValueIterator>(nested);
+    return std::make_unique<DictValueIterator>(nested);
   } else if (IsMappingHelper(nested)) {
-    return absl::make_unique<MappingValueIterator>(nested);
+    return std::make_unique<MappingValueIterator>(nested);
   } else if (IsAttrsHelper(nested)) {
-    return absl::make_unique<AttrsValueIterator>(nested);
+    return std::make_unique<AttrsValueIterator>(nested);
   } else {
-    return absl::make_unique<SequenceValueIterator>(nested);
+    return std::make_unique<SequenceValueIterator>(nested);
   }
 }
 
@@ -741,7 +745,7 @@ inline py::object pyo_or_throw(PyObject* ptr) {
   return py::reinterpret_steal<py::object>(ptr);
 }
 
-PYBIND11_MODULE(_tree, m) {
+PYBIND11_MODULE(_tree, m, py::mod_gil_not_used()) {
   // Resolve `wrapt.ObjectProxy` at import time to avoid doing
   // imports during function calls.
   tree::GetWraptObjectProxyType();

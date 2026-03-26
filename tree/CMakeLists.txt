@@ -19,7 +19,7 @@ if(Python3_VERSION VERSION_LESS "3.6.0")
 endif()
 
 # Use C++14 standard.
-set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++ version selection")
+set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ version selection")
 
 # Position-independent code is needed for Python extension modules.
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -89,8 +89,8 @@ endif()
 
 FetchContent_Declare(
   absl
-  URL         ${ABSEIL_REPO}/archive/refs/tags/20220623.2.tar.gz
-  URL_HASH    SHA256=773652c0fc276bcd5c461668dc112d0e3b6cde499600bfe3499c5fdda4ed4a5b
+  URL         ${ABSEIL_REPO}/archive/refs/tags/20260107.1.tar.gz
+  URL_HASH    SHA256=4314e2a7cbac89cac25a2f2322870f343d81579756ceff7f431803c2c9090195
   CMAKE_ARGS  ${ABSEIL_CMAKE_ARGS}
   EXCLUDE_FROM_ALL
   ${ABSEIL_FIND_PACKAGE_ARGS})
@@ -103,8 +103,8 @@ endif()
 
 FetchContent_Declare(
   pybind11
-  URL       https://github.com/pybind/pybind11/archive/refs/tags/v2.10.1.tar.gz
-  URL_HASH  SHA256=111014b516b625083bef701df7880f78c2243835abdb263065b6b59b960b6bad
+  URL       https://github.com/pybind/pybind11/archive/refs/tags/v3.0.1.tar.gz
+  URL_HASH  SHA256=741633da746b7c738bb71f1854f957b9da660bcd2dce68d71949037f0969d0ca
   ${PYBIND11_FIND_PACKAGE_ARGS})
 
 FetchContent_MakeAvailable(absl pybind11)
