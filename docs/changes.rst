@@ -2,6 +2,13 @@
 Changelog
 #########
 
+Version 0.1.10
+==============
+
+Released 2026-03-31
+
+* Added support for Python 3.14.
+
 Version 0.1.9
 =============
 
