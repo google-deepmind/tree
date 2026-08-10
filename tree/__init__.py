@@ -59,7 +59,7 @@ __all__ = [
     "MAP_TO_NONE",
 ]
 
-__version__ = "0.1.10"
+__version__ = "0.2.0"
 
 # Note: this is *not* the same as `six.string_types`, which in Python3 is just
 #       `(str,)` (i.e. it does not include byte strings).
@@ -92,18 +92,18 @@ _IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ_WITH_PATH = (
     "If shallow structure is a sequence, input must also be a sequence. "
     "Input at path: {path} has type: {input_type}.")
 
-K = TypeVar("K")
-V = TypeVar("V")
-
 # A generic monomorphic structure type, e.g. ``StructureKV[str, int]``
 # is an arbitrarily nested structure where keys must be of type ``str``
 # and values are integers.
-StructureKV = Union[
+#
+# Python 3.12+ explicit generic type alias syntax
+# https://peps.python.org/pep-0695/#generic-type-alias
+type StructureKV[K, V] = Union[
     Sequence["StructureKV[K, V]"],
     Mapping[K, "StructureKV[K, V]"],
     V,
 ]
-Structure = StructureKV[str, V]
+type Structure[V] = StructureKV[str, V]
 
 
 def _get_attrs_items(obj):

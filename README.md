@@ -42,6 +42,10 @@ $ python setup.py install
 If you are having issues, please let us know by filing an issue on our
 [issue tracker](https://github.com/deepmind/tree/issues).
 
+## Changelog
+
+0.2.0: Only supports Python 3.12 or above.
+
 ## License
 
 The project is licensed under the Apache 2.0 license.
