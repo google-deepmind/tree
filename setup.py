@@ -127,7 +127,7 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     # Contained modules and scripts.
     packages=setuptools.find_packages(),
-    python_requires='>=3.10',
+    python_requires='>=3.12',
     install_requires=[
         'absl-py>=0.6.1',
         'attrs>=18.2.0',

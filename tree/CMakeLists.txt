@@ -15,7 +15,7 @@ find_package(Python3 COMPONENTS Interpreter Development)
 include_directories(SYSTEM ${Python3_INCLUDE_DIRS})
 if(Python3_VERSION VERSION_LESS "3.6.0")
   message(FATAL_ERROR
-    "Python found ${Python3_VERSION} < 3.6.0")
+    "Python found ${Python3_VERSION} < 3.12.0")
 endif()
 
 # Use C++14 standard.

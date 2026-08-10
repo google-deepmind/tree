@@ -9,6 +9,6 @@ sphinx:
   fail_on_warning: false
 
 python:
-  version: 3.7
+  version: 3.12
   install:
   - requirements: docs/requirements.txt
