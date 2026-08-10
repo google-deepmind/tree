@@ -49,6 +49,24 @@ namespace {
 // held when the destructor is called.
 using PyObjectPtr = std::unique_ptr<PyObject, DecrementsPyRefcount>;
 
+// Looks up a dict item and returns a new reference. Borrowed dict references
+// are unsafe on free-threaded Python because another thread may remove the
+// item before its reference count can be incremented.
+int GetDictItemNewRef(PyObject* dict, PyObject* key, PyObject** result) {
+#if PY_VERSION_HEX >= 0x030D0000
+  return PyDict_GetItemRef(dict, key, result);
+#else
+  PyObject* item = PyDict_GetItemWithError(dict, key);
+  if (item == nullptr) {
+    *result = nullptr;
+    return PyErr_Occurred() ? -1 : 0;
+  }
+  Py_INCREF(item);
+  *result = item;
+  return 1;
+#endif
+}
+
 const int kMaxItemsInCache = 1024;
 
 std::atomic<bool> WarnedThatSetIsNotSequence{false};
@@ -279,12 +297,11 @@ class DictValueIterator : public ValueIterator {
     PyObjectPtr result;
     PyObjectPtr key(PyIter_Next(iter_.get()));
     if (key) {
-      // PyDict_GetItem returns a borrowed reference.
-      PyObject* elem = PyDict_GetItem(dict_, key.get());
-      if (elem) {
-        Py_INCREF(elem);
+      PyObject* elem = nullptr;
+      const int found = GetDictItemNewRef(dict_, key.get(), &elem);
+      if (found == 1) {
         result.reset(elem);
-      } else {
+      } else if (found == 0) {
         PyErr_SetString(PyExc_RuntimeError,
                         "Dictionary was modified during iteration over it");
       }
@@ -547,10 +564,18 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
         return true;
       }
 
-      PyObject* key;
-      Py_ssize_t pos = 0;
-      while (PyDict_Next(o1, &pos, &key, nullptr)) {
-        if (PyDict_GetItem(o2, key) == nullptr) {
+      // Iterate over a snapshot so every key has a strong reference while a
+      // lookup in o2 may invoke arbitrary Python (__hash__ or __eq__).
+      PyObjectPtr keys(PyDict_Keys(o1));
+      if (!keys) return false;
+      const Py_ssize_t num_keys = PyList_GET_SIZE(keys.get());
+      for (Py_ssize_t i = 0; i < num_keys; ++i) {
+        PyObject* value = nullptr;
+        const int found = GetDictItemNewRef(
+            o2, PyList_GET_ITEM(keys.get(), i), &value);
+        Py_XDECREF(value);
+        if (found < 0) return false;
+        if (found == 0) {
           SetDifferentKeysError(o1, o2, error_msg, is_type_error);
           return true;
         }
