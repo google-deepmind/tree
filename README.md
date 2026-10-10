@@ -37,6 +37,15 @@ Build from source:
 $ python setup.py install
 ```
 
+The runtime package does not require NumPy, attrs, or Abseil. These libraries
+are used only by the test suite and can be installed separately with the
+optional test dependencies:
+
+```shell
+$ pip install 'dm-tree[test]'
+$ pytest --pyargs tree
+```
+
 ## Support
 
 If you are having issues, please let us know by filing an issue on our

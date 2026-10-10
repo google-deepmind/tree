@@ -67,7 +67,7 @@ jobs:
           CIBW_ENABLE: cpython-freethreading cpython-prerelease
           CIBW_SKIP: "*musllinux* *i686* *win32* *t-win*"
           CIBW_TEST_COMMAND: pytest --pyargs tree
-          CIBW_TEST_REQUIRES: pytest
+          CIBW_TEST_EXTRAS: test
           MAKEFLAGS: "-j$(nproc)"
       - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08  # v4.6.0
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
