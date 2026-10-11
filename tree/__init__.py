@@ -20,6 +20,8 @@ import logging
 import sys
 from typing import Mapping, Sequence, TypeVar, Union
 
+from typing_extensions import TypeAliasType
+
 from .sequence import _is_attrs
 from .sequence import _is_namedtuple
 from .sequence import _sequence_like
@@ -103,7 +105,12 @@ StructureKV = Union[
     Mapping[K, "StructureKV[K, V]"],
     V,
 ]
-Structure = StructureKV[str, V]
+# A proper named generic alias stays subscriptable for static analyzers such
+# as pylint (see #134), while retaining the same recursive structure shape.
+# TypeAliasType is available on all supported Python versions through
+# typing_extensions.
+Structure = TypeAliasType(
+    "Structure", StructureKV[str, V], type_params=(V,))
 
 
 def _get_attrs_items(obj):

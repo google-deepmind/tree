@@ -17,7 +17,7 @@
 import collections
 import doctest
 import types
-from typing import Any, Iterator, Mapping
+from typing import Any, Iterator, Mapping, get_args, get_origin
 import unittest
 
 from absl.testing import parameterized
@@ -46,6 +46,16 @@ class DoctestTest(parameterized.TestCase):
 
 
 class NestTest(parameterized.TestCase):
+
+  def testStructureIsASubscriptableGenericTypeAlias(self):
+    # TypeAliasType prevents static tooling from incorrectly classifying
+    # tree.Structure[int] as an unsubscriptable object (see issue #134).
+    self.assertEqual(tree.Structure.__name__, "Structure")
+    structure_of_ints = tree.Structure[int]
+    self.assertIs(get_origin(structure_of_ints), tree.Structure)
+    self.assertEqual(get_args(structure_of_ints), (int,))
+    # Underlying alias continues to describe the original recursive union.
+    self.assertEqual(tree.Structure.__value__, tree.StructureKV[str, tree.V])
 
   def assertAllEquals(self, a, b):
     self.assertTrue((np.asarray(a) == b).all())
