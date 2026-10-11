@@ -138,6 +138,7 @@ setuptools.setup(
         "numpy>=2.1.0; python_version>='3.13'",
         "numpy>=2.3.2; python_version>='3.14'",
         'wrapt>=1.11.2',
+        'typing_extensions>=4.9.0',
     ],
     test_suite='tree',
     cmdclass=dict(build_ext=BuildCMakeExtension),
