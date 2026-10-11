@@ -106,6 +106,21 @@ def _sequence_like(instance, args):
     # For object proxies, first create the underlying type and then re-wrap it
     # in the proxy type.
     return type(instance)(_sequence_like(instance.__wrapped__, args))
+  elif (type(instance).__module__ == 'numpy' and
+        type(instance).__name__ == 'ndarray'):
+    # np.ndarray(args) interprets args as a *shape*, not sequence values.
+    # Import NumPy lazily: dm-tree does not require it at runtime.
+    import numpy as np  # pylint: disable=g-import-not-at-top
+
+    args = list(args)
+    if all(np.isscalar(value) for value in args):
+      return np.asarray(args)
+
+    # Keep tensors and custom leaf objects intact, including scalar tensors
+    # that NumPy might otherwise implicitly convert to ordinary numbers.
+    result = np.empty(len(args), dtype=object)
+    result[:] = args
+    return result
   else:
     # Not a namedtuple
     return type(instance)(args)
