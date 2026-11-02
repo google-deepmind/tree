@@ -102,6 +102,12 @@ class CachedTypeCheck {
     for (const auto& pair : type_to_sequence_map_) {
       Py_DECREF(pair.first);
     }
+    for (const auto& pair : instance_class_to_sequence_map_) {
+      Py_DECREF(pair.first);
+      for (const auto& instance_class : pair.second) {
+        Py_DECREF(instance_class.first);
+      }
+    }
   }
 
   // Caches successful executions of the one-argument (PyObject*) callable
@@ -114,12 +120,26 @@ class CachedTypeCheck {
     // before.
     auto* type = Py_TYPE(o);
 
+    bool instance_dependent;
     {
       absl::MutexLock lock(mutex_);
       auto it = type_to_sequence_map_.find(type);
       if (it != type_to_sequence_map_.end()) {
         return it->second;
       }
+      instance_dependent = instance_class_to_sequence_map_.find(type) !=
+                           instance_class_to_sequence_map_.end();
+    }
+
+    PyObjectPtr instance_class;
+    if (instance_dependent) {
+      // Attribute access can re-enter Python, so do it outside the mutex.
+      instance_class.reset(PyObject_GetAttrString(o, "__class__"));
+      if (!instance_class) return -1;
+      absl::MutexLock lock(mutex_);
+      const auto& results = instance_class_to_sequence_map_.at(type);
+      auto it = results.find(instance_class.get());
+      if (it != results.end()) return it->second;
     }
 
     int check_result = ternary_predicate_(o);
@@ -127,6 +147,19 @@ class CachedTypeCheck {
     if (check_result == -1) {
       return -1;  // Type check error, not cached.
     }
+
+    if (!instance_class) {
+      instance_class.reset(PyObject_GetAttrString(o, "__class__"));
+      if (!instance_class) {
+        PyErr_Clear();
+        return check_result;
+      }
+    }
+    // Transparent proxies can report a different __class__ for each instance
+    // or after replacing __wrapped__. Keep those results separate from the
+    // ordinary type cache, keyed by both physical and reported class.
+    instance_dependent |=
+        instance_class.get() != reinterpret_cast<PyObject*>(type);
 
     // NOTE: This is never decref'd as long as the object lives, which is likely
     // forever, but we don't want the type to get deleted as long as it is in
@@ -136,9 +169,21 @@ class CachedTypeCheck {
     // map to 1024.
     {
       absl::MutexLock lock(mutex_);
-      if (type_to_sequence_map_.size() < kMaxItemsInCache) {
-        Py_INCREF(type);
-        type_to_sequence_map_.insert({type, check_result});
+      if (type_to_sequence_map_.size() + instance_class_cache_size_ <
+          kMaxItemsInCache) {
+        if (instance_dependent) {
+          auto inserted = instance_class_to_sequence_map_.try_emplace(type);
+          if (inserted.second) Py_INCREF(type);
+          auto result = inserted.first->second.insert(
+              {instance_class.get(), check_result});
+          if (result.second) {
+            Py_INCREF(instance_class.get());
+            ++instance_class_cache_size_;
+          }
+        } else {
+          auto result = type_to_sequence_map_.insert({type, check_result});
+          if (result.second) Py_INCREF(type);
+        }
       }
     }
 
@@ -148,6 +193,9 @@ class CachedTypeCheck {
  private:
   std::function<int(PyObject*)> ternary_predicate_;
   std::unordered_map<PyTypeObject*, bool> type_to_sequence_map_;
+  std::unordered_map<PyTypeObject*, std::unordered_map<PyObject*, bool>>
+      instance_class_to_sequence_map_;
+  size_t instance_class_cache_size_ = 0;
   mutable absl::Mutex mutex_;
 };
 

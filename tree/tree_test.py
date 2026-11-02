@@ -94,6 +94,85 @@ class NestTest(parameterized.TestCase):
     new_structure = tree.map_structure(lambda x: x, structure)
     self.assertEqual(structure, new_structure)
 
+  @parameterized.parameters([False, True])
+  def testObjectProxyHeterogeneousLeaves(self, reverse):
+    class Proxy(wrapt.ObjectProxy):
+      pass
+
+    @attr.s
+    class State:
+      weight = attr.ib()
+      bias = attr.ib()
+
+    point = collections.namedtuple("Point", ["x", "y"])
+    mapping = {"b": 4, "a": 3}
+    values = [[1, 2], mapping, State(5, 6), point(7, 8),
+              mapping.values(), 9, np.array([10, 11])]
+    expected = [[1, 2], [3, 4], [5, 6], [7, 8], [4, 3], [9],
+                [values[-1]]]
+    if reverse:
+      values.reverse()
+      expected.reverse()
+    for value, leaves in zip(values, expected):
+      proxy = Proxy(value)
+      if isinstance(value, (int, np.ndarray)):
+        leaves = [proxy]
+      actual = tree.flatten(proxy)
+      self.assertLen(actual, len(leaves))
+      for actual_leaf, expected_leaf in zip(actual, leaves):
+        self.assertIs(actual_leaf, expected_leaf)
+
+  def testObjectProxyReassignment(self):
+    class Proxy(wrapt.ObjectProxy):
+      pass
+
+    proxy = Proxy([1, 2])
+    self.assertEqual(tree.flatten(proxy), [1, 2])
+    proxy.__wrapped__ = {"b": 4, "a": 3}
+    self.assertEqual(tree.flatten(proxy), [3, 4])
+    proxy.__wrapped__ = 5
+    self.assertEqual(tree.flatten(proxy), [5])
+    proxy.__wrapped__ = [6, 7]
+    self.assertEqual(tree.flatten(proxy), [6, 7])
+
+  def testObjectProxyClassControls(self):
+    class ListSubclass(list):
+      pass
+
+    class DictSubclass(dict):
+      pass
+
+    # Populate caches for genuine Python classes, then interleave their
+    # ordinary and wrapped instances. Wrapping must not pollute the cache
+    # used for the wrapped objects' actual classes, either.
+    values = [ListSubclass([1, 2]), DictSubclass(b=4, a=3)]
+    for value, expected in zip(values, [[1, 2], [3, 4]]):
+      for _ in range(2):
+        self.assertEqual(tree.flatten(value), expected)
+        self.assertEqual(tree.flatten(wrapt.ObjectProxy(value)), expected)
+    with self.assertRaises(TypeError):
+      tree.flatten(DictSubclass({1: 1, "a": 2}))
+    self.assertEqual(tree.flatten(DictSubclass(a=3)), [3])
+
+  @parameterized.parameters([np.float32, np.float64])
+  def testObjectProxyNumericMap(self, dtype):
+    class Proxy(wrapt.ObjectProxy):
+      pass
+
+    # Optimizer-style updates must visit arrays and a scalar using the same
+    # proxy class, even though only the array container is nested.
+    weights = [np.array([1., 2.], dtype=dtype),
+               np.array([3., 4.], dtype=dtype)]
+    tree.flatten(Proxy(weights))
+    state = [Proxy(weights), Proxy(5.)]
+    updated = tree.map_structure(lambda value: value - 0.5, state)
+    self.assertIsInstance(updated[0], Proxy)
+    np.testing.assert_array_equal(updated[0][0], [0.5, 1.5])
+    np.testing.assert_array_equal(updated[0][1], [2.5, 3.5])
+    self.assertEqual(updated[1], 4.5)
+    self.assertEqual(updated[0][0].dtype, dtype)
+    self.assertEqual(updated[0][1].dtype, dtype)
+
   def testFlattenAndUnflatten(self):
     structure = ((3, 4), 5, (6, 7, (9, 10), 8))
     flat = ["a", "b", "c", "d", "e", "f", "g", "h"]
