@@ -18,7 +18,7 @@
 from collections import abc as collections_abc
 import logging
 import sys
-from typing import Mapping, Sequence, TypeVar, Union
+from typing import Mapping, Sequence, TypeAlias, TypeVar, Union
 
 from .sequence import _is_attrs
 from .sequence import _is_namedtuple
@@ -98,12 +98,12 @@ V = TypeVar("V")
 # A generic monomorphic structure type, e.g. ``StructureKV[str, int]``
 # is an arbitrarily nested structure where keys must be of type ``str``
 # and values are integers.
-StructureKV = Union[
+StructureKV: TypeAlias = Union[
     Sequence["StructureKV[K, V]"],
     Mapping[K, "StructureKV[K, V]"],
     V,
 ]
-Structure = StructureKV[str, V]
+Structure: TypeAlias = StructureKV[str, V]
 
 
 def _get_attrs_items(obj):
