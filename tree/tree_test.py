@@ -16,6 +16,9 @@
 
 import collections
 import doctest
+import gc
+import sys
+import threading
 import types
 from typing import Any, Iterator, Mapping
 import unittest
@@ -355,6 +358,65 @@ class NestTest(parameterized.TestCase):
   def testAssertSameStructure_dictionaryDifferentKeys(self):
     with self.assertRaisesRegex(ValueError, "don't have the same set of keys"):
       tree.assert_same_structure({"a": 1}, {"b": 1})
+
+  @unittest.skipUnless(
+      not getattr(sys, "_is_gil_enabled", lambda: True)(),
+      "requires free-threaded Python")
+  def testAssertSameStructure_dictionaryConcurrentMutation(self):
+    class Key(str):
+      __slots__ = ()
+
+      def __hash__(self):
+        return str.__hash__(self)
+
+    num_comparers = 8
+    num_mutators = 3
+    rounds = 4000
+    size = 32
+    structure = {Key(f"k{i}"): i for i in range(size)}
+    other = {Key(f"k{i}"): i for i in range(size)}
+    stop = threading.Event()
+    barrier = threading.Barrier(num_comparers + num_mutators + 1)
+    completed = [0] * num_comparers
+
+    def compare(index):
+      barrier.wait()
+      for _ in range(rounds):
+        try:
+          tree.assert_same_structure(structure, other)
+        except (RuntimeError, ValueError):
+          pass
+        completed[index] += 1
+
+    def mutate():
+      barrier.wait()
+      i = 0
+      while not stop.is_set():
+        structure[Key(f"k{i % size}")] = i
+        i += 1
+
+    comparers = [
+        threading.Thread(target=compare, args=(i,))
+        for i in range(num_comparers)
+    ]
+    mutators = [threading.Thread(target=mutate) for _ in range(num_mutators)]
+    was_gc_enabled = gc.isenabled()
+    gc.disable()
+    try:
+      for thread in comparers + mutators:
+        thread.start()
+      barrier.wait()
+      for thread in comparers:
+        thread.join()
+      stop.set()
+      for thread in mutators:
+        thread.join()
+    finally:
+      stop.set()
+      if was_gc_enabled:
+        gc.enable()
+
+    self.assertEqual(sum(completed), num_comparers * rounds)
 
   def testAssertSameStructure_sameNameNamedTuples(self):
     tree.assert_same_structure(NestTest.SameNameab(0, 1),
