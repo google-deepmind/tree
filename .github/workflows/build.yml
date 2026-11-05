@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
-      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: '3.11'
       - name: Create sdist
@@ -37,13 +37,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-2022]  # latest
+        os: [ubuntu-24.04, macos-14, windows-2022, windows-11-arm]  # latest
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           submodules: true
-      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.11"
       - name: Set up QEMU
@@ -65,7 +65,7 @@ jobs:
           CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp313t-* cp314-* cp314t-*"
           CIBW_BUILD_VERBOSITY: 1
           CIBW_ENABLE: cpython-freethreading cpython-prerelease
-          CIBW_SKIP: "*musllinux* *i686* *win32* *t-win*"
+          CIBW_SKIP: "*musllinux* *i686* *win32* *t-win* cp310-win_arm64"
           CIBW_TEST_COMMAND: pytest --pyargs tree
           CIBW_TEST_REQUIRES: pytest
           MAKEFLAGS: "-j$(nproc)"
