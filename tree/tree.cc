@@ -279,6 +279,21 @@ class DictValueIterator : public ValueIterator {
     PyObjectPtr result;
     PyObjectPtr key(PyIter_Next(iter_.get()));
     if (key) {
+#if PY_VERSION_HEX >= 0x030D0000
+      // PyDict_GetItemRef is atomic with respect to concurrent mutation
+      // (relevant for free-threaded builds) and returns a strong reference.
+      PyObject* elem = nullptr;
+      const int found = PyDict_GetItemRef(dict_, key.get(), &elem);
+      if (found < 0) {
+        return result;
+      }
+      if (found == 1) {
+        result.reset(elem);
+      } else {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "Dictionary was modified during iteration over it");
+      }
+#else
       // PyDict_GetItem returns a borrowed reference.
       PyObject* elem = PyDict_GetItem(dict_, key.get());
       if (elem) {
@@ -288,6 +303,7 @@ class DictValueIterator : public ValueIterator {
         PyErr_SetString(PyExc_RuntimeError,
                         "Dictionary was modified during iteration over it");
       }
+#endif
     }
     return result;
   }
@@ -547,9 +563,18 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
         return true;
       }
 
-      PyObject* key;
-      Py_ssize_t pos = 0;
-      while (PyDict_Next(o1, &pos, &key, nullptr)) {
+      // Iterate over a snapshot of o1's keys instead of PyDict_Next.
+      // PyDict_Next yields borrowed references and is unsafe if another
+      // thread mutates o1 while the comparison is running (free-threaded
+      // builds). The lookup in o2 can execute Python __hash__/__eq__ code,
+      // so the key must be kept alive by the snapshot list.
+      PyObjectPtr keys(PyDict_Keys(o1));
+      if (keys == nullptr) {
+        return true;
+      }
+      const Py_ssize_t num_keys = PyList_GET_SIZE(keys.get());
+      for (Py_ssize_t i = 0; i < num_keys; ++i) {
+        PyObject* key = PyList_GET_ITEM(keys.get(), i);  // Owned by `keys`.
         if (PyDict_GetItem(o2, key) == nullptr) {
           SetDifferentKeysError(o1, o2, error_msg, is_type_error);
           return true;
