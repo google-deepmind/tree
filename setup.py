@@ -129,16 +129,23 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     python_requires='>=3.10',
     install_requires=[
-        'absl-py>=0.6.1',
-        'attrs>=18.2.0',
-        'numpy>=1.21',
-        "numpy>=1.21.2; python_version>='3.10'",
-        "numpy>=1.23.3; python_version>='3.11'",
-        "numpy>=1.26.0; python_version>='3.12'",
-        "numpy>=2.1.0; python_version>='3.13'",
-        "numpy>=2.3.2; python_version>='3.14'",
         'wrapt>=1.11.2',
     ],
+    extras_require={
+        # The library does not import these packages in production. They are
+        # needed only by the bundled tree/tree_test.py test suite.
+        'test': [
+            'absl-py>=0.6.1',
+            'attrs>=18.2.0',
+            'numpy>=1.21',
+            "numpy>=1.21.2; python_version>='3.10'",
+            "numpy>=1.23.3; python_version>='3.11'",
+            "numpy>=1.26.0; python_version>='3.12'",
+            "numpy>=2.1.0; python_version>='3.13'",
+            "numpy>=2.3.2; python_version>='3.14'",
+            'pytest>=7',
+        ],
+    },
     test_suite='tree',
     cmdclass=dict(build_ext=BuildCMakeExtension),
     ext_modules=[CMakeExtension('_tree', source_dir='tree')],
