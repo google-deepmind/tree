@@ -17,8 +17,8 @@ jobs:
     name: sdist
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
-      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           python-version: '3.11'
       - name: Create sdist
@@ -29,7 +29,7 @@ jobs:
       - name: List output directory
         run: ls -lh dist/dm_tree*.tar.gz
         shell: bash
-      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08  # v4.6.0
+      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
         with:
           name: dm-tree-sdist
@@ -44,10 +44,10 @@ jobs:
         os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2022]  # latest
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
-      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           python-version: "3.11"
       - name: Install cibuildwheel
@@ -65,8 +65,63 @@ jobs:
           CIBW_TEST_ENVIRONMENT: PIP_PREFER_BINARY=1
           CIBW_TEST_REQUIRES: pytest
           MAKEFLAGS: "-j$(nproc)"
-      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08  # v4.6.0
+      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'created') }}
         with:
           name: dm-tree-bdist-wheel-${{ matrix.os }}-${{ strategy.job-index }}
           path: wheelhouse/*.whl
+
+  publish:
+    name: Stage sdist and wheels to OSS Exit Gate (PyPI)
+    needs: [sdist, bdist-wheel]
+    if: ${{ github.event_name == 'release' && github.event.action == 'created' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: '3.11'
+      - name: Download sdist and wheels
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          pattern: dm-tree-*
+          merge-multiple: true
+          path: dist
+      - name: Authenticate to Google Cloud (OSS Exit Gate)
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        with:
+          workload_identity_provider: 'projects/305452601764/locations/global/workloadIdentityPools/builders/providers/github'
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
+      - name: Clean up stale releases from staging repo
+        run: |
+          packages=$(gcloud artifacts packages list \
+              --project="oss-exit-gate-prod" \
+              --location="us" \
+              --repository="tree--pypi" \
+              --format="value(name)" 2>/dev/null)
+          echo "${packages}" | xargs -r -I {} sh -c '
+              package_name=$(basename "{}")
+              echo "Deleting package: $package_name..."
+              gcloud artifacts packages delete "{}" \
+                  --project="oss-exit-gate-prod" \
+                  --location="us" \
+                  --repository="tree--pypi" \
+                  --quiet
+          '
+      - name: Stage distributions to OSS Exit Gate and upload manifest
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          python -m pip install --upgrade twine
+          python -m twine upload \
+            --repository-url "https://us-python.pkg.dev/oss-exit-gate-prod/tree--pypi/" \
+            -u oauth2accesstoken \
+            -p "$(gcloud auth print-access-token)" \
+            dist/*
+          echo '{"publish_all": true}' > manifest.json
+          gcloud storage cp manifest.json \
+            "gs://oss-exit-gate-prod-projects-bucket/tree/pypi/manifests/manifest-${RUN_ID}-${RUN_ATTEMPT}.json"
