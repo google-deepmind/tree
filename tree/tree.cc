@@ -479,14 +479,15 @@ bool AssertSameStructureHelper(PyObject* o1, PyObject* o2, bool check_types,
   // Got to scalars, so finished checking. Structures are the same.
   if (!is_seq1) return true;
 
+  // Unwrap wrapt.ObjectProxy if needed. Keep wrapped owners alive across
+  // GetValueIterator and recursive error formatting below.
+  PyObjectPtr o1_wrapped;
+  PyObjectPtr o2_wrapped;
   if (check_types) {
-    // Unwrap wrapt.ObjectProxy if needed.
-    PyObjectPtr o1_wrapped;
     if (IsObjectProxy(o1)) {
       o1_wrapped.reset(PyObject_GetAttrString(o1, "__wrapped__"));
       o1 = o1_wrapped.get();
     }
-    PyObjectPtr o2_wrapped;
     if (IsObjectProxy(o2)) {
       o2_wrapped.reset(PyObject_GetAttrString(o2, "__wrapped__"));
       o2 = o2_wrapped.get();
