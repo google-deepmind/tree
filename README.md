@@ -1,5 +1,7 @@
 # Tree
 
+[English](README.md) | [简体中文](https://github.com/google-deepmind/tree/blob/master/README.zh.md)
+
 `tree` is a library for working with nested data structures. In a way, `tree`
 generalizes the builtin `map` function which only supports flat sequences,
 and allows to apply a function to each "leaf" preserving the overall
