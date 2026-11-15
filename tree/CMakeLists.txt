@@ -103,8 +103,8 @@ endif()
 
 FetchContent_Declare(
   pybind11
-  URL       https://github.com/pybind/pybind11/archive/refs/tags/v3.0.1.tar.gz
-  URL_HASH  SHA256=741633da746b7c738bb71f1854f957b9da660bcd2dce68d71949037f0969d0ca
+  URL       https://github.com/pybind/pybind11/archive/refs/tags/v3.1.0.tar.gz
+  URL_HASH  SHA256=ef712655692a2e9bf7bb7874c022564a45f91d847ddee987e720cd9e28849665
   ${PYBIND11_FIND_PACKAGE_ARGS})
 
 FetchContent_MakeAvailable(absl pybind11)
