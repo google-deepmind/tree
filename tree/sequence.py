@@ -77,8 +77,9 @@ def _sequence_like(instance, args):
     if isinstance(instance, collections.defaultdict):
       # `defaultdict` requires a default factory as the first argument.
       return type(instance)(instance.default_factory, keys_and_values)
-    elif isinstance(instance, types.MappingProxyType):
-      # MappingProxyType requires a dict to proxy to.
+    elif isinstance(instance, (types.MappingProxyType, collections.Counter)):
+      # MappingProxyType needs a mapping; Counter would count an iterable of
+      # (key, value) pairs instead of retaining the supplied counts.
       return type(instance)(dict(keys_and_values))
     else:
       return type(instance)(keys_and_values)
