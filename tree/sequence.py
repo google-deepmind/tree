@@ -81,7 +81,7 @@ def _sequence_like(instance, args):
       # MappingProxyType requires a dict to proxy to.
       return type(instance)(dict(keys_and_values))
     else:
-      return type(instance)(keys_and_values)
+      return type(instance)(tuple(keys_and_values))
   elif isinstance(instance, collections_abc.MappingView):
     # We can't directly construct mapping views, so we create a list instead
     return list(args)
