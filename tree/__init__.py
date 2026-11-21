@@ -796,6 +796,30 @@ def flatten_with_path(structure):
   return list(_yield_flat_up_to(structure, structure))
 
 
+def unflatten_with_path(flat_structure):
+  """Inverse of flatten_with_path.
+
+  Args:
+    flat_structure: A list of `(path, item)` pairs corresponding to the
+      flattened version of a hierachical structure flattened with
+      `flatten_with_path()`.
+
+  Returns:
+    A hierachically structure of dicts holding the items nested according to
+    their path.
+  """
+  structure = {}
+  for path, value in flat_structure:
+    container = structure
+    while len(path) > 1:
+      if path[0] not in container:
+        container[path[0]] = {}
+      container = container[path[0]]
+      path = path[1:]
+    container[path[0]] = value
+  return structure
+
+
 #: Special value for use with :func:`traverse`.
 MAP_TO_NONE = object()
 

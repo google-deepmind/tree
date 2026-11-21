@@ -965,6 +965,13 @@ class NestTest(parameterized.TestCase):
   def testFlattenWithPath(self, inputs, expected):
     self.assertEqual(tree.flatten_with_path(inputs), expected)
 
+    self.assertEqual(
+        tree.flatten_with_path(
+            tree.unflatten_with_path(tree.flatten_with_path(inputs))
+        ),
+        expected,
+    )
+
   @parameterized.named_parameters([
       dict(testcase_name="Tuples", s1=(1, 2), s2=(3, 4),
            check_types=True, expected=(((0,), 4), ((1,), 6))),
