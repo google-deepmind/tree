@@ -28,7 +28,7 @@ $ pip install dm-tree
 Directly from github using pip:
 
 ```shell
-$ pip install git+git://github.com/deepmind/tree.git
+$ pip install git+https://github.com/deepmind/tree.git
 ```
 
 Build from source:
